@@ -21,13 +21,11 @@ import pandas as pd
 import tensorflow as tf
 import keras
 from scmaui import __version__
-#from scmaui.ensembles import EnsembleVAE
-from scmaui.ensembles import BatchEnsembleVAE
+from scmaui.ensembles import EnsembleVAE
 from scmaui.data import load_data
-from scmaui.data import load_batch_labels
-from scmaui.data import one_hot_encode_batches
-from scmaui.utils import resnet_vae_params
-from scmaui.utils import resnet_vae_batch_params
+from scmaui.data import SCDataset
+from scmaui.data import combine_modalities
+from scmaui.utils import get_model_params
 from scmaui.utils import get_variable_regions
 import scanpy as sc
 import logging
@@ -48,7 +46,7 @@ def main(args=None):
                         help='Names of the output modalities.')
 
     parser.add_argument('-loss', dest='loss', type=str, nargs='+',
-                        default='mse', choices=['mul', 'mse', 'binary', 'binom',
+                        default='mse', choices=['mul', 'mse', 'binary', 'poisson',
                                                 'negmul', 'negmul2', 'zinb', 'mixgaussian', 'negbinom', 'gamma', 'mixgamma',
                                                ],
                         help="Loss associated with each modality.")
@@ -68,6 +66,8 @@ def main(args=None):
                         default=128,
                         help='Batch size. Default: 128.')
     parser.add_argument('-overwrite', dest='overwrite',
+                        action='store_true', default=False)
+    parser.add_argument('-evaluate', dest='evaluate',
                         action='store_true', default=False)
     parser.add_argument('-skip_outliers', dest='skip_outliers',
                         action='store_true', default=False,
@@ -100,13 +100,13 @@ def main(args=None):
                         help="Dropout applied after each decoder hidden layer. Default=0.3")
     parser.add_argument("-feature_fraction", dest="feature_fraction", type=float, default=1.,
                         help="Whether to use a random subset of features. feature_fraction determines the proportion of features to use. Default=1.")
-    parser.add_argument("-batches", dest="batches", type=str, default=None,
-                        help="Table in tsv format defining the cell batches. "
-                             "The first columns should represent the barcode "
-                             "while the remaining columns represent the batches as categorical labels.")
 
-    parser.add_argument("-batchnames", dest="batchnames", type=str, nargs='+', default=[],
+    parser.add_argument("-adversarial", dest="adversarial", type=str, nargs='+', default=[],
                         help="Batch names in the anndata dataset. ")
+
+    parser.add_argument("-conditional", dest="conditional", type=str, nargs='+', default=[],
+                        help="Batch names in the anndata dataset. ")
+
     parser.add_argument("-modelname", dest="modelname", type=str, default='vae', choices=[
                                                                                           'scmaui-0', 'scmaui',
                                                                                           'bcvae', 'bcvae2',
@@ -132,52 +132,49 @@ def main(args=None):
 
     data = args.data
     datanames = args.datanames
-    outdatanames = args.outdatanames
     outdata = args.outdata
-    batches = args.batches
+    outdatanames = args.outdatanames
 
-    batchnames = ['basebatch']
-    batchnames += args.batchnames
     # load the dataset
-    adatas = load_data(data, outdata)
-    #adatas = dict()
-    #adatas['input'] = load_data(data, datanames)
-    #if outdata is None:
-    #    adatas['output'] = adatas['input']
-    #else:
-    #    adatas['output'] = load_data(outdata, outdatanames)
+    adatas = load_data(data, datanames, outdata, outdatanames)
 
-    params = resnet_vae_params(args)
-    params['inputmodality'] = list(adatas['input'].keys())
-    params['outputmodality'] = list(adatas['output'].keys())
+    dataset = SCDataset(adatas, args.adversarial, args.conditional)
+    print(dataset)
 
-    adatas['input'][list(adatas['input'].keys())[0]].obs.loc[:,'basebatch'] = 'basebatch'
+    params = get_model_params(dataset, args=args)
 
-    adatas['input'] = one_hot_encode_batches(adatas['input'], batchnames)
-    params.update(resnet_vae_batch_params(adatas['input'], batchnames))
+    #params.update(get_dataset_params(dataset))
+    #params.update(get_loss_params())
+    metamodel = EnsembleVAE(params,
+                            args.nrepeat, 
+                            args.modelname,
+                            args.feature_fraction,)
 
-    metamodel = BatchEnsembleVAE(args.modelname, params,
-                            args.nrepeat, args.output,
-                            args.overwrite,
-                            args.feature_fraction,
-                            params['batchnames'])
+    if not args.evaluate:
+        metamodel.fit(dataset,
+                      epochs=args.epochs,
+                      batch_size=args.batch_size)
+        metamodel.save(args.output)
+    else:
+        metamodel.load(args.output)
 
-    metamodel.fit(adatas, epochs=args.epochs, batch_size=args.batch_size)
+    latent, latent_list = metamodel.encode(dataset, skip_outliers=args.skip_outliers)
 
-    print(adatas)
-    oadata = metamodel.combine_modalities(adatas)
-    oadata = metamodel.encode(adatas, oadata, skip_outliers=args.skip_outliers)
-    #adata = metamodel.impute(adatas)
+    for i, ldf in enumerate(latent_list):
+        ldf.to_csv(os.path.join(args.output, f'repeat_{i+1}', 'latent.csv'))
+    latent.to_csv(os.path.join(args.output, 'latent.csv'))
 
-    #firstkey = list(oadata.keys())[0]
+    oadata = combine_modalities(dataset.adata['input'])
     adata = oadata
+    adata.obsm['scmaui-ensemble'] = latent.values
+    for i, lat in enumerate(latent_list):
+        adata.obsm[f'scmaui-{i+1}'] = lat.values
+
     sc.pp.neighbors(adata, n_neighbors=15, use_rep="scmaui-ensemble")
     sc.tl.louvain(adata, resolution=args.resolution)
     sc.tl.umap(adata)
 
     if 'batchnames' not in params:
         params['batchnames'] = None
-    #adata = get_variable_regions(adata, batches=params['batchnames'])
     adata.write(os.path.join(args.output, "analysis.h5ad"), compression='gzip')
-    print(adata)
     print('saved to ' + os.path.join(args.output, "analysis.h5ad"))
