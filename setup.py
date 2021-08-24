@@ -37,6 +37,8 @@ setup(
     url='https://github.com/wkopp/scmaui',
     packages=find_packages('src'),
     package_dir={'': 'src'},
+    package_data={'scmaui': ['resources/*.h5ad',
+                             'resources/*.csv']},
     py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
     include_package_data=True,
     zip_safe=False,
