@@ -10,9 +10,27 @@ from scmaui.model_components import *
 from scmaui.data import to_dataset
 from scmaui.data import to_sparse
 from scipy.stats import iqr
+from scipy.sparse import vstack
 
 class EnsembleVAE:
-    def __init__(self, params, repeats, model=None, feature_fraction=1.):
+    """ Ensemble of VAEs
+
+    This class maintains an ensemble of VAE models
+    and provides an interface to fit, save, load and evaluate the models.
+
+    Parameters
+    ----------
+    params : dict
+        Model parameters
+    repeats : int
+        Ensemble size. Default=1
+    model : str
+        Model name. Currently not in use.
+    feature_fraction : float
+        Subset fraction of features for ensemble training. Currently not in use.
+    """
+
+    def __init__(self, params, repeats=1, model=None, feature_fraction=1.):
         self.repeats = repeats
         self.models = []
 
@@ -38,6 +56,11 @@ class EnsembleVAE:
         else:
             raise ValueError(f"Unknown model: {model}")
         return model
+
+    def summary(self):
+        assert len(self.models) > 0, "No models available yet."
+        assert len(self.models) > 0, "No models available yet."
+        self.models[0].summary()
 
     def save(self, path, overwrite=False):
         """ save the ensemble """
@@ -109,7 +132,67 @@ class EnsembleVAE:
         
         for i, model in enumerate(self.models):
             out = model.predict(tf_X)
+            if not isinstance(out, (list,tuple)):
+                out = [out]
             for i, o in enumerate(out):
                 output[i] += o / len(self.models)
 
         return output
+
+    def explain(self, dataset, cellids, baselineids=None, modelid=0):
+        # get positive and baseline examples
+        posdata = dataset.subset(cellids)
+        if baselineids is None:
+            negall = dataset.exclude(cellids)
+            negdata = negall.sample(len(cellids))
+        else:
+            negdata = dataset.subset(baselineids)
+            negdata = negdata.sample(len(cellids))
+
+        posdata = posdata.evaluation_data(as_tf_data=False)
+        negdata = negdata.evaluation_data(as_tf_data=False)
+         
+        S = 50 # integration steps
+        # prepare new dataset for the integration
+        alpha = np.linspace(0,1,S).reshape(-1, 1,1)
+
+        X = [tf.convert_to_tensor((np.expand_dims(np.nan_to_num(p.toarray()),0)*alpha + \
+                                   np.expand_dims(np.nan_to_num(n.toarray()),0)*(1-alpha)).reshape(-1, n.shape[-1]), dtype=tf.float32) \
+             for p,n in zip(posdata[0][0], negdata[0][0])]
+
+        deltaX = [tf.convert_to_tensor((np.nan_to_num(p.toarray()) - \
+                                        np.nan_to_num(n.toarray())).reshape(-1, n.shape[-1]), dtype=tf.float32) for \
+                  p,n in zip(posdata[0][0], negdata[0][0])]
+
+        mask = [tf.convert_to_tensor(vstack([m1.multiply(m2)]*S).toarray(), dtype=tf.float32) \
+                for m1, m2 in zip(posdata[0][1], negdata[0][1])]
+        cond = [tf.convert_to_tensor(np.kron(c, np.ones((S,1))), dtype=tf.float32) for c in posdata[1]]
+        adv = [tf.convert_to_tensor(np.kron(a, np.ones((S,1))), dtype=tf.float32) for a in posdata[1]]
+
+        ds = [X, mask], adv, cond
+        
+        def compute_gradients(model, X,mask, cond, fidx):
+            with tf.GradientTape() as tape:
+                tape.watch(X)
+                latent = model([X, mask, cond])
+                f = tf.math.reduce_sum(latent[:,fidx])
+            G = tape.gradient(f, X)
+            return [g*m for g,m in zip(G, mask)]
+
+        model = self.models[modelid].encoder_mean.model
+        fidx =0
+        ig_total = [np.zeros((d, self.space['latentdims'])) for d in self.space['inputdims']]
+        for fidx in range(self.space['latentdims']):
+             grads = compute_gradients(model, X, mask, cond, fidx)
+             # grads dims are equal to input dims
+             igrads = [dx * 1/S* tf.reduce_sum(tf.reshape(g, (S,-1,n.shape[-1])), axis=0) \
+                       for m, dx, n,g in zip(mask, deltaX, negdata[0][0], grads)]
+
+             mean_igrads = [tf.reduce_sum(ig, axis=0) / \
+                            tf.reduce_sum(tf.convert_to_tensor(m.toarray(),
+                                                               dtype=tf.float32)) \
+                            for ig, m in zip(igrads, posdata[0][1])]
+             for i, ig in enumerate(mean_igrads):
+                 ig_total[i][:,fidx] = ig.numpy()
+        
+        return ig_total
