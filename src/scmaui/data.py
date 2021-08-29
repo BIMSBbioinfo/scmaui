@@ -92,12 +92,12 @@ def load_data_(data, names):
         adata.append(ada)
     return adata
 
-def load_data(data, innames, outdata=None, outnames=None):
+def load_data(data, names, outdata=None, outnames=None):
     """ Helper function to load input and output anndata objects """
     if outdata is None:
-        outdata, outnames = data, innames
+        outdata, outnames = data, names
 
-    adatas = {'input': load_data_(data, innames),
+    adatas = {'input': load_data_(data, names),
               'output': load_data_(outdata, outnames)}
     return adatas
 
@@ -134,15 +134,16 @@ def _make_ds_list(x):
     ds_x = tf.data.Dataset.zip(tuple(ds_x))
     return ds_x
 
-def _make_masked_ds(X):
-    ds, mask = X
+def _make_masked_ds(ds, mask):
     return tuple([_make_ds_list(x) for x in [ds, mask]])
 
 def to_dataset(X, advlabels=None, condlabels=None, Y=None, batch_size=64, shuffle=True):
     """ generate a tensorflow dataset """
-    ds_x = _make_masked_ds(X)
+    x, mx = X
+    ds_x = _make_masked_ds(x, mx)
     if Y is not None:
-        ds_y = _make_masked_ds(Y)
+        y, my = Y
+        ds_y = _make_masked_ds(y,my)
         ds_x = tf.data.Dataset.zip((ds_x, ds_y))
 
     ds_advlabels = ()
@@ -233,12 +234,14 @@ def _intersect(adata):
 
 class SCDataset:
     """ Multi-modal dataset generator """
-    def __init__(self, adata, adversarial=None, conditional=None, union=True):
+    def __init__(self, adata, losses, adversarial=None, conditional=None, union=True):
         adata = copy.deepcopy(adata)
         self.union = union
         self.adata = _unionize(adata) if union else _intersect(adata)
         self.adversarial = [] if adversarial is None else adversarial
         self.conditional = [] if conditional is None else conditional
+        self.losses = losses
+        assert len(self.adata['output']) == len(losses), "Please specify a loss for each output modality."
 
     def __str__(self):
         s = 'Inputs: non-missing/samples x features\n'
@@ -257,12 +260,28 @@ class SCDataset:
         s += f'{len(self.conditional)} Conditionals: {[x for x in self.conditional]}' 
         return s
 
+    def __repr__(self):
+        return str(self)
+
     def subset(self, cellids):
+        """ get a subset of the dataset based on a list of sample/cell ids """
         adata = {k: [ada[cellids,:].copy() for ada in self.adata[k]] for k in self.adata}
-        return SCDataset(adata, adversarial=self.adversarial,
+        return SCDataset(adata, self.losses, adversarial=self.adversarial,
                          conditional=self.conditional, union=self.union)
 
+    def exclude(self, cellids):
+        """ get a subset of the dataset based on a list of sample/cell ids """
+        adata = {k: [ada[~ada.obs.index.isin(cellids),:].copy() for ada in self.adata[k]] for k in self.adata}
+        return SCDataset(adata, self.losses, adversarial=self.adversarial,
+                         conditional=self.conditional, union=self.union)
+
+    def sample(self, N):
+        """ get a random sample dataset containing N cells """
+        rcellids = np.random.choice(self.adata['input'][0].obs.index.tolist(), N, replace=False)
+        return self.subset(rcellids)
+
     def modalities(self):
+        """ returns the modality names for the inputs and outputs """
         inp = []
         for ada in self.adata['input']:
             inp.append(ada.uns['view'])
@@ -272,6 +291,7 @@ class SCDataset:
         return inp, oup
 
     def adversarial_config(self):
+        """ configuration for the adversarial labels """
         X, mask_x, Y, mask_y, advlabel, condlabel, advdtype, conddtype = self._get_input_output_data(self.adata)
         shapes = {}
         shapes['adversarial_name'] = self.adversarial
@@ -280,6 +300,7 @@ class SCDataset:
         return shapes
 
     def conditional_config(self):
+        """ configuration for the conditional features """
         X, mask_x, Y, mask_y, advlabel, condlabel, advdtype, conddtype = self._get_input_output_data(self.adata)
         shapes = {}
         shapes['conditional_name'] = self.conditional
@@ -288,6 +309,7 @@ class SCDataset:
         return shapes
 
     def shapes(self):
+        """ get the dataset shapes """
         X, mask_x, Y, mask_y, advlabel, condlabel, advdtype, conddtype = self._get_input_output_data(self.adata)
         shapes = {}
         shapes['inputdims'] = [x.shape[1] for x in X]
@@ -295,8 +317,12 @@ class SCDataset:
         return shapes
  
     def size(self):
+        """ get the dataset size """
         _, mask_x, _, _, _, _, _, _ = self._get_input_output_data(self.adata)
         return mask_x[0].shape[0]
+
+    def __len__(self):
+        return self.size()
 
     def training_data(self, batch_size=64, validation_split=0.15, as_tf_data=True):
         # unpack the data
