@@ -32,12 +32,13 @@ are stored in the output directory (-output)
 ::
 
    scmaui -data adata.h5ad \
+         -names gtx \
          -output <outputdir> \
          -epochs 200 \
-         -nrepeats 10 \
+         -ensemble_size 10 \
          -nlatent 15 \
-         -batchnames batch \
-         -modelname scmaui
+         -adversarial label1 label2 \
+         -conditional covariate1 covariate2
  
 Additional information on available hyper-parameters are available through
 
