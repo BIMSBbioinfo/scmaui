@@ -2,41 +2,34 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras import initializers
 
-@tf.function
-def gaussian_likelihood(targets, mask, mu, sigma):
-    #return - mask * (.5*tf.math.square((targets - mu)/sigma) + tf.math.log(sigma))
-    return - mask * tf.math.square(targets - mu)
-
+# helper functions
 @tf.function
 def gaussian_mean(mu, sigma):
+    """ return gaussian mean """
     return mu
 
 @tf.function
-def gamma_likelihood(targets, mask, alpha, beta):
-    likeli = alpha * tf.math.log(beta)
-    likeli -= tf.math.lgamma(alpha)
-    likeli += (alpha - 1) * targets
-    likeli -= beta * targets
-    return mask * likeli 
-
-@tf.function
 def gamma_mean(alpha, beta):
+    """ return mean of gamma distribution """
     return alpha/beta
 
 @tf.function
-def mixture_predict(pi, mu):
+def mixture_mean(pi, mu):
+    """ compute mixture model mean """
     return tf.reduce_sum(_softmax(pi) * mu, axis=-1)
 
 
 @tf.function
 def log_softmax(x):
-    #x = x - xmax
+    """ compute (nan-aware) log-softmax"""
+    x = tf.where(tf.math.is_nan(x), tf.math.log(tf.zeros_like(x)), x)
     sp = x - tf.reduce_logsumexp(x, axis=-1, keepdims=True)
     return sp
 
 @tf.function
 def _softmax(x):
-    xmax = tf.reduce_max(x, axis=-1, keepdims=True)
+    """ compute softmax """
+    xmax = tf.stop_gradient(tf.reduce_max(x, axis=-1, keepdims=True))
     x = x - xmax
     sp = tf.exp(x) / tf.reduce_sum(tf.exp(x), axis=-1, keepdims=True)
     tf.debugging.check_numerics(sp, "_softmax is NaN")
@@ -44,8 +37,11 @@ def _softmax(x):
 
 @tf.function
 def softmax1p_mask(x, mask):
+    """ compute exp(xi) / [1 + sum_j exp(xj)] missing-value aware"""
+    # set activation of missing components to -inf (through log(0.0))
+    # so the softmax effectively rangers over a reduced dimenionality
     x = x + tf.math.log(mask)
-    xmax = tf.reduce_max(x, axis=-1, keepdims=True)
+    xmax = tf.stop_gradient(tf.reduce_max(x, axis=-1, keepdims=True))
     x = x - xmax
     sp = tf.exp(x) / (tf.exp(-xmax)+ tf.reduce_sum(tf.exp(x), axis=-1, keepdims=True))
     tf.debugging.check_numerics(sp, "softmax1p_mask is NaN")
@@ -53,9 +49,12 @@ def softmax1p_mask(x, mask):
 
 @tf.function
 def softmax1p0_mask(x, mask):
+    """ compute 1 / [1 + sum_j exp(xj)] missing-value aware"""
+    # set activation of missing components to -inf (through log(0.0))
+    # so the softmax effectively rangers over a reduced dimenionality
     x = x + tf.math.log(mask)
-    xmax = tf.reduce_max(x, axis=-1, keepdims=True)
-    x = x - tf.reduce_max(x, axis=-1, keepdims=True)
+    xmax = tf.stop_gradient(tf.reduce_max(x, axis=-1, keepdims=True))
+    x = x - xmax
     sp = tf.exp(-xmax)/ (tf.exp(-xmax)+ tf.reduce_sum(tf.exp(x), axis=-1, keepdims=True))
     tf.debugging.check_numerics(sp, "softmax1p0_mask is NaN")
     return sp
@@ -63,7 +62,8 @@ def softmax1p0_mask(x, mask):
 
 @tf.function
 def softmax1p(x):
-    xmax = tf.reduce_max(x, axis=-1, keepdims=True)
+    """ compute exp(xi) / [1 + sum_j exp(xj)] """
+    xmax = tf.stop_gradient(tf.reduce_max(x, axis=-1, keepdims=True))
     x = x - xmax
     sp = tf.exp(x) / (tf.exp(-xmax)+ tf.reduce_sum(tf.exp(x), axis=-1, keepdims=True))
     tf.debugging.check_numerics(sp, "softmax1p is NaN")
@@ -72,6 +72,7 @@ def softmax1p(x):
 
 @tf.function
 def softmax1p0(x):
+    """ compute 1 / [1 + sum_j exp(xj)] """
     xmax = tf.reduce_max(x, axis=-1)
     x = x - tf.reduce_max(x, axis=-1, keepdims=True)
     sp = tf.exp(-xmax)/ (tf.exp(-xmax)+ tf.reduce_sum(tf.exp(x), axis=-1))
@@ -79,57 +80,120 @@ def softmax1p0(x):
     tf.debugging.check_numerics(sp, "softmax1p0 is NaN")
     return sp
 
+# log-likelihood functions
 
 @tf.function
-def multinomial_likelihood(targets, mask, logits):
+def gaussian_likelihood(targets, mu):
+    """ gaussian-likelihood """
+    mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
+    targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+
+    loglikeli = - mask * tf.math.square(targets - mu)
+    return loglikeli
+
+@tf.function
+def gamma_likelihood(targets, alpha, beta):
+    """ gamma-likelihood """
+    mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
+    targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+
+    loglikeli = alpha * tf.math.log(beta)
+    loglikeli -= tf.math.lgamma(alpha)
+    loglikeli += (alpha - 1) * tf.math.log(targets + 1e-7)
+    loglikeli -= beta * targets
+
+    loglikeli *= mask
+    return loglikeli
+
+
+@tf.function
+def multinomial_likelihood(targets, logits):
+    """ multinomial-likelihood """
+    mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
+    targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+
     logits += tf.math.log(mask)
-    log = logits - tf.math.reduce_logsumexp(logits, axis=-1, keepdims=True)
-    return tf.where(tf.math.is_inf(log), tf.zeros_like(log), targets * log)
+    loglikeli = target * (logits - tf.math.reduce_logsumexp(logits, axis=-1, keepdims=True))
+    return loglikeli
 
 @tf.function
-def binomial_likelihood(targets, mask, logits, N):
-    log = targets * tf.math.log_sigmoid(logits) + (N-targets) * tf.math.log_sigmoid(-logits)
-    return mask * log
+def poisson_likelihood(targets, logits):
+    """ poisson-likelihood """
+    mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
+    targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+
+    loglikeli = mask * (targets * tf.math.log(logits) - logits)
+    return loglikeli
 
 @tf.function
-def negative_binomial_likelihood(targets, mask, logits, r):
-    likeli = tf.math.lgamma(targets + r) - tf.math.lgamma(r) - tf.math.lgamma(targets + 1.)
-    likeli += targets * tf.math.log_sigmoid(logits)
-    likeli += r * tf.math.log_sigmoid(-logits)
-    return mask * likeli
+def binomial_likelihood(targets, logits, N):
+    """ binomial-likelihood """
+    mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
+    targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+
+    loglikeli = mask * (targets * tf.math.log_sigmoid(logits) + (N-targets) * tf.math.log_sigmoid(-logits))
+    return loglikeli
 
 @tf.function
-def zero_inflated_negative_binomial_likelihood(targets, mask, logits, r, pi):
+def negative_binomial_likelihood(targets, logits, r):
+    """ negative binomial-likelihood """
+    mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
+    targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+
+    loglikeli = tf.math.lgamma(targets + r) - tf.math.lgamma(r) - tf.math.lgamma(targets + 1.)
+    loglikeli += targets * tf.math.log_sigmoid(logits)
+    loglikeli += r * tf.math.log_sigmoid(-logits)
+
+    loglikeli *= mask
+    return loglikeli
+
+@tf.function
+def zero_inflated_negative_binomial_likelihood(targets, logits, r, pi):
+    """ zero-inflated negative binomial-likelhood """
+    mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
+    targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+
     # negative binom
-    likeli = tf.math.lgamma(targets + r) - tf.math.lgamma(r) - tf.math.lgamma(targets + 1.)
-    likeli += targets * tf.math.log_sigmoid(logits)
-    likeli += r * tf.math.log_sigmoid(-logits)
+    loglikeli = tf.math.lgamma(targets + r) - tf.math.lgamma(r) - tf.math.lgamma(targets + 1.)
+    loglikeli += targets * tf.math.log_sigmoid(logits)
+    loglikeli += r * tf.math.log_sigmoid(-logits)
     #zi
-    likeli0 = tf.where(targets>0, tf.math.log(tf.zeros_like(targets)), targets)
-    likeli = tf.experimental.numpy.logaddexp(tf.math.log_sigmoid(pi) + likeli0, 
-                                             tf.math.log_sigmoid(-pi) + likeli)
-    return mask * likeli
+    loglikeli0 = tf.where(targets>0, tf.math.log(tf.zeros_like(targets)), targets)
+    loglikeli = tf.experimental.numpy.logaddexp(tf.math.log_sigmoid(pi) + loglikeli0, 
+                                             tf.math.log_sigmoid(-pi) + loglikeli)
+
+    loglikeli *= mask
+    return loglikeli
 
 @tf.function
 def mixture_likelihood(pi, likelihood_, *args):
+    """ general likelihood for mixture models """
     return tf.math.logsumexp(log_softmax(pi) + likehood(*args), axis=-1)
 
 @tf.function
-def negative_multinomial_likelihood(targets, mask, logits, r):
+def negative_multinomial_likelihood(targets, logits, r):
+    """ negative multinomial-likelihood """
+    mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
+    targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+
+    #mask = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), tf.ones_like(targets))
     likeli = tf.reduce_sum(tf.math.xlogy(targets, softmax1p_mask(logits, mask)+1e-10), axis=-1)
     tf.debugging.check_numerics(likeli, "targets * log(p)")
     likeli += tf.math.xlogy(r, softmax1p0_mask(logits, mask) + 1e-10)
     tf.debugging.check_numerics(likeli, "r * log(1-p)")
-    likeli += tf.math.lgamma(r + tf.reduce_sum(targets*mask, axis=-1))
+    likeli += tf.math.lgamma(r + tf.reduce_sum(targets, axis=-1))
     tf.debugging.check_numerics(likeli, "lgamma(r + x)")
     likeli -= tf.math.lgamma(r)
     tf.debugging.check_numerics(likeli, "lgamma(r)")
+
     return likeli
 
 
 @tf.function
-def negative_multinomial_likelihood_v2(targets, mask, mul_logits, p0_logits, r):
-    X = tf.reduce_sum(targets*mask, axis=-1)
+def negative_multinomial_likelihood_v2(targets, mul_logits, p0_logits, r):
+    """ negative multinomial-likelihood (using independent p0 parameters) """
+    T = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+    X = tf.reduce_sum(T, axis=-1)
     #nb likelihood
     likeli = tf.math.lgamma(r + X)
     likeli -= tf.math.lgamma(r)
@@ -138,17 +202,101 @@ def negative_multinomial_likelihood_v2(targets, mask, mul_logits, p0_logits, r):
     likeli += r * tf.math.log_sigmoid(p0_logits)
     likeli += X * tf.math.log_sigmoid(-p0_logits)
 
-    #likeli += tf.reduce_sum(tf.math.xlogy(r, tf.math.sigmoid(p0_logits)+1e-10), axis=-1)
-
     # mul likelihood
-    logp = log_softmax(mul_logits + tf.math.log(mask))
-    logp = tf.where(tf.math.is_inf(logp), tf.zeros_like(logp), logp)
-    likeli += tf.reduce_sum(targets * logp, axis=-1)
+    logp = log_softmax(mul_logits + tf.where(tf.math.is_nan(targets), tf.math.log(tf.zeros_like(targets))), tf.zeros_like(targets))
+    
+    likeli += tf.reduce_sum(tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets * logp), axis=-1)
     tf.debugging.check_numerics(likeli, "negative_multinomial_likelihood_v2")
     return likeli
 
+@tf.function
+def dirichlet_multinomial_likelihood(targets, mul_logits, alphasum):
+    """ dirichlet multinomial-likelihood """
+    mask = tf.where(tf.math.is_nan(targets),
+                    tf.zeros_like(targets),
+                    tf.ones_like(targets))
+    T = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+    X = tf.reduce_sum(T, axis=-1)
+
+    # correct in case there are missing values
+    alpha = _softmax(mul_logits) * alphasum
+    alphasum_new = alpha * mask
+
+    #nb likelihood
+    likeli0 = tf.math.lgamma(alphasum_new)
+    likeli0 += tf.math.lgamma(X+1)
+    likeli0 -= tf.math.lgamma(X + alphasum_new)
+
+    likeli1 += mask * tf.math.lgamma(T + alpha)
+    likeli1 -= mask * tf.math.lgamma(alpha)
+    likeli1 -= mask * tf.math.lgamma(T + 1.)
+
+    likeli = likeli0 + tf.reduce_sum(likeli1, axis=-1)
+    tf.debugging.check_numerics(likeli, "dirichlet_multinomial_likelihood")
+    return likeli
+
+
+#@tf.function
+#def dirichlet_likelihood(targets, mul_logits, alphasum):
+#    mask = tf.where(tf.math.is_nan(targets),
+#                    tf.zeros_like(targets),
+#                    tf.ones_like(targets))
+#    T = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+#    X = tf.reduce_sum(T, axis=-1)
+#
+#    mul_logits += tf.where(tf.math.is_nan(targets),
+#                           tf.math.log(tf.zeros_like(targets)),
+#                           tf.zeros_like(targets))
+#
+#    # correct in case there are missing values
+#    alpha = _softmax(mul_logits) * alphasum
+#    alphasum_new = alpha * mask
+#
+#    likeli = tf.math.lgamma(tf.math.reduce_sum(alpha, axis=-1))
+#    likeli -= tf.math.lgamma(alpha
+#
+#    #nb likelihood
+#    likeli0 = tf.math.lgamma(alphasum_new)
+#    likeli0 += tf.math.lgamma(X+1)
+#    likeli0 -= tf.math.lgamma(X + alphasum_new)
+#
+#    likeli1 += mask * tf.math.lgamma(T + alpha)
+#    likeli1 -= mask * tf.math.lgamma(alpha)
+#    likeli1 -= mask * tf.math.lgamma(T + 1.)
+#
+#    likeli = likeli0 + tf.reduce_sum(likeli1, axis=-1)
+#    tf.debugging.check_numerics(likeli, "dirichlet_likelihood")
+#    return likeli
+
+
+@tf.function
+def negative_dirichlet_multinomial_likelihood(targets, mul_logits, alphasum, r0, alpha0):
+    mask = tf.where(tf.math.is_nan(targets),
+                    tf.zeros_like(targets),
+                    tf.ones_like(targets))
+    T = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
+    X = tf.reduce_sum(T, axis=-1)
+
+    # correct in case there are missing values
+    alpha = _softmax(mul_logits) * alphasum
+    alphasum_new = alpha * mask
+
+    #nb likelihood
+    likeli0 = _lbeta(X+r0, alphasum + alpha0)
+    likeli0 -= _lbeta(r0, alpha0)
+    
+    likeli1 += mask * tf.math.lgamma(T + alpha)
+    likeli1 -= mask * tf.math.lgamma(T+1)
+    likeli1 -= mask * tf.math.lgamma(alpha)
+
+    likeli = likeli0 + tf.reduce_sum(likeli1, axis=-1)
+    tf.debugging.check_numerics(likeli, "negative_dirichlet_multinomial_likelihood")
+    return likeli
+
+
 
 class ExpandDims(layers.Layer):
+    """ helper layer to expand the dimensions of a tensor """
     def __init__(self, axis=1, *args, **kwargs):
         super(ExpandDims, self).__init__(*args, **kwargs)
         self.axis = axis
@@ -161,8 +309,72 @@ class ExpandDims(layers.Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class JointSigma(layers.Layer):
+    """ Compute combined latent sigma across modalities """
+    def __init__(self, *args, **kwargs):
+        super(JointSigma, self).__init__(*args, **kwargs)
+    def get_config(self):
+        return super(JointSigma, self).get_config()
+    def compute_output_shape(self, input_sigma, input_masks):
+        return input_sigma[0], input_mask[0]
+    def call(self, sigmas, masks):
+        if not isinstance(sigmas, (list, tuple)):
+            sigmas = [sigmas]
+        if not isinstance(masks, (list, tuple)):
+            masks = [masks]
+        
+        [tf.debugging.check_numerics(o, 'jointsigma_inputs nan') for o in sigmas]
+        mtotal = tf.math.add_n(masks)
+        jointvar = tf.math.add_n([m * tf.math.exp(-sigma) for m, sigma in zip(masks, sigmas)])
+        
+        # add correction if all modalities are zero
+        # to avoid division by zero
+        c = tf.where(mtotal<1, tf.ones_like(mtotal), tf.zeros_like(mtotal))
+        jointvar += c
+
+        jointvar = tf.math.log(tf.math.reciprocal(jointvar))
+        tf.debugging.check_numerics(jointvar, 'jointvar_output nan')
+        return jointvar
+
+class JointMean(layers.Layer):
+    """ Compute combined latent means across modelities """
+    def __init__(self, *args, **kwargs):
+        super(JointMean, self).__init__(*args, **kwargs)
+    def get_config(self):
+        return super(JointMean, self).get_config()
+    def compute_output_shape(self, input_mu, input_sigma, input_masks):
+        return input_mu[0], input_sigma[0], input_mask[0]
+        
+    def call(self, mus, sigmas, masks):
+        if not isinstance(mus, (list, tuple)):
+            # some issue with keras?
+            # after loading a saved model this sees
+            mus = [mus]
+        if not isinstance(sigmas, (list, tuple)):
+            sigmas = [sigmas]
+        if not isinstance(masks, (list, tuple)):
+            masks = [masks]
+
+        jointmean = tf.math.add_n([m * mu * tf.math.exp(-sigma) for m, mu, sigma in zip(masks, mus, sigmas)])
+        jointvar = tf.math.add_n([m*tf.math.exp(-sigma) for m, sigma in zip(masks, sigmas)])
+
+        # add correction if all modalities are zero
+        # to avoid division by zero
+        mtotal = tf.math.add_n(masks)
+        c = tf.where(mtotal<1, tf.ones_like(mtotal), tf.zeros_like(mtotal))
+        jointvar += c
+
+        jointmean *= tf.math.reciprocal(jointvar)
+        tf.debugging.check_numerics(jointmean, "jointmean_output nan")
+        self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.square(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
+        self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.abs(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
+        return jointmean
 
 class ClipLayer(layers.Layer):
+    """ Clip values between a min and max value
+
+    This is used to avoid too large or too small variance terms.
+    """
     def __init__(self, min_value, max_value, *args, **kwargs):
         super(ClipLayer, self).__init__(*args, **kwargs)
         self.min_value = min_value
@@ -181,8 +393,6 @@ class Sampling(layers.Layer):
     """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
     def call(self, inputs):
         z_mean, z_log_var = inputs
-        #z_mean = tf.expand_dims(z_mean, axis=1)
-        #z_log_var = tf.expand_dims(z_log_var, axis=1)
         batch = tf.shape(z_mean)[0]
         dim = tf.shape(z_mean)[-1]
         epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
@@ -190,57 +400,24 @@ class Sampling(layers.Layer):
 
 
 class KLlossLayer(layers.Layer):
+    """ Compute KL-divergence """
     def call(self, inputs):
         z_mean, z_log_var = inputs
         kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
-        kl_loss = tf.reduce_mean(kl_loss)
+        kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=-1))
         kl_loss *= -0.5
+        tf.debugging.check_numerics(kl_loss, 'kl_loss layer nan')
         self.add_loss(kl_loss)
         return z_mean, z_log_var
 
-class BatchLoss(layers.Layer):
-    def __init__(self, *args, **kwargs):
-        super(BatchLoss, self).__init__(*args, **kwargs)
-        self.catmet = tf.keras.metrics.CategoricalAccuracy(name='bacc')
-        self.binmet = tf.keras.metrics.AUC(name='bauc')
-
-    def call(self, inputs):
-        if len(inputs) < 2:
-            return inputs
-        pred_batch, true_batch = inputs
-        tf.debugging.assert_non_negative(pred_batch)
-        tf.debugging.assert_non_negative(true_batch)
-        loss = 0.0
-        for tb, pb in zip(true_batch, pred_batch):
-            loss += tf.reduce_sum(-tf.math.xlogy(tb, pb+1e-9))
-            self.add_metric(self.catmet(tb,pb))
-            self.add_metric(self.binmet(tb[:,0,0],pb[:,-1,0]))
-        tf.debugging.check_numerics(loss, "targets * log(p)")
-
-        self.add_loss(loss)
-        return pred_batch
-
-    def compute_output_shape(self, input_shape):
-        return input_shape[0]
-
-#class AverageChannel(layers.Layer):
-#    def call(self, inputs):
-#        return tf.math.reduce_mean(inputs, axis=-1, keepdims=True)
-#    def compute_output_shape(self, input_shape):
-#        return input_shape[:-1] + (1,)
-
-
-#class ScalarBiasLayer(layers.Layer):
-#    def build(self, input_shape):
-#        self.bias = self.add_weight('bias',
-#                                    shape=(1,),
-#                                    initializer='ones',
-#                                    trainable=True)
-#    def call(self, x):
-#        return tf.ones((tf.shape(x)[0],) + (1,)*(len(x.shape.as_list())-1))*self.bias
 
 
 class MutInfoLayer(layers.Layer):
+    """ Compute mutual information loss across feature activities
+
+    This can be used to enforce latent feature activities to
+    be uncorrelated.
+    """
     def __init__(self, start_delay=100, *args, **kwargs):
         self.start_delay = start_delay
         super(MutInfoLayer, self).__init__(*args, **kwargs)
@@ -283,9 +460,9 @@ class MutInfoLayer(layers.Layer):
             cov = tf.reduce_mean(x_zero_0*x_zero_1, axis=[i for i in range(len(input_shape)-1)])
             cov = cov + tf.eye(cov.shape[0])
 
+            # estimated covariance matrix needs to be positive-definite
             tf.debugging.assert_positive(tf.linalg.det(cov))
 
-            #ml_loss = -0.5 * (tf.linalg.logdet(cov) - tf.reduce_sum(tf.math.log(tf.linalg.diag_part(cov))))
             ml_loss = -0.5 * (tf.linalg.logdet(cov) - tf.reduce_sum(tf.math.log(tf.linalg.diag_part(cov))))
             return ml_loss
 
@@ -303,14 +480,15 @@ class MutInfoLayer(layers.Layer):
 
 
 class MSEEndpoint(layers.Layer):
+    """ MSE-endpoint """
     def call(self, inputs):
         targets = None
-        targets, masks, mu, sigma = inputs
+        targets, masks, mu = inputs
 
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           tf.reduce_sum(gaussian_likelihood(targets, masks, mu, sigma), axis=-1)
+                           masks * tf.reduce_sum(gaussian_likelihood(targets, mu), axis=-1)
                          )
             self.add_loss(reconstruction_loss)
 
@@ -320,6 +498,7 @@ class MSEEndpoint(layers.Layer):
         return mu
 
 class GammaEndpoint(layers.Layer):
+    """ Gamma-endpoint """
     def call(self, inputs):
         targets = None
         targets, masks, alpha, gamma = inputs
@@ -327,23 +506,24 @@ class GammaEndpoint(layers.Layer):
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           tf.reduce_sum(gamma_likelihood(targets, alpha, gamma), axis=-1)
+                           masks * tf.reduce_sum(gamma_likelihood(targets, alpha, gamma), axis=-1)
                          )
             self.add_loss(reconstruction_loss)
 
             tf.debugging.check_numerics(reconstruction_loss,
-                                        "MSEEndpoint NaN")
+                                        "GammaEndpoint NaN")
 
         return alpha/gamma
 
 class MultinomialEndpoint(layers.Layer):
+    """ Multinomial-endpoint """
     def call(self, inputs):
         targets, masks, logits = inputs
 
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           tf.reduce_sum(multinomial_likelihood(targets, masks, logits), axis=-1)
+                           masks * tf.reduce_sum(multinomial_likelihood(targets, logits), axis=-1)
                          )
             self.add_loss(reconstruction_loss)
 
@@ -352,7 +532,23 @@ class MultinomialEndpoint(layers.Layer):
 
         return _softmax(logits)
 
+class PoissonEndpoint(layers.Layer):
+    """ Poisson-endpoint """
+    def call(self, inputs):
+        targets, masks, logits = inputs
+
+        if targets is not None:
+            reconstruction_loss = -tf.reduce_mean(
+                           masks * tf.reduce_sum(poisson_likelihood(targets, logits), axis=-1)
+                         )
+            self.add_loss(reconstruction_loss)
+
+            tf.debugging.check_numerics(reconstruction_loss,
+                                        "PoissonEndpoint NaN")
+        return logits
+
 class BinomialEndpoint(layers.Layer):
+    """ Binomial model """
     def __init__(self, N, *args, **kwargs):
         self.N = N
         super(BinomialEndpoint, self).__init__(*args, **kwargs)
@@ -367,9 +563,9 @@ class BinomialEndpoint(layers.Layer):
         targets, masks, logits = inputs
 
         if targets is not None:
-
+            x = tf.reduce_sum(binomial_likelihood(targets, logits, self.N), axis=-1)
             reconstruction_loss = -tf.reduce_mean(
-                           tf.reduce_sum(binomial_likelihood(targets, masks, logits, self.N), axis=-1)
+                           masks * tf.reduce_sum(binomial_likelihood(targets, logits, self.N), axis=-1)
                          )
             self.add_loss(reconstruction_loss)
 
@@ -379,7 +575,7 @@ class BinomialEndpoint(layers.Layer):
         return tf.math.sigmoid(logits)
 
 class ZeroInflatedNegativeBinomialEndpoint(layers.Layer):
- 
+    """ Zero-inflated negative binomial-endpoint """
     def call(self, inputs):
         targets = None
         targets, masks, logits, r, pi = inputs
@@ -387,7 +583,7 @@ class ZeroInflatedNegativeBinomialEndpoint(layers.Layer):
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           tf.reduce_sum(zero_inflated_negative_binomial_likelihood(targets, masks, logits, r, pi), axis=-1)
+                           masks * tf.reduce_sum(zero_inflated_negative_binomial_likelihood(targets, logits, r, pi), axis=-1)
                          )
             self.add_loss(reconstruction_loss)
 
@@ -397,7 +593,7 @@ class ZeroInflatedNegativeBinomialEndpoint(layers.Layer):
         return r * tf.math.sigmoid(logits) / tf.math.sigmoid(-logits)
 
 class NegativeBinomialEndpoint(layers.Layer):
- 
+    """ Negative binomial-endpoint """
     def call(self, inputs):
         targets = None
         targets, masks, logits, r = inputs
@@ -405,7 +601,7 @@ class NegativeBinomialEndpoint(layers.Layer):
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           tf.reduce_sum(negative_binomial_likelihood(targets, masks, logits, r), axis=-1)
+                           masks * tf.reduce_sum(negative_binomial_likelihood(targets, logits, r), axis=-1)
                          )
             self.add_loss(reconstruction_loss)
 
@@ -415,6 +611,7 @@ class NegativeBinomialEndpoint(layers.Layer):
         return r * tf.math.sigmoid(logits) / tf.math.sigmoid(-logits)
 
 class NegativeMultinomialEndpoint(layers.Layer):
+    """ Negative multinomial-endpoint """
     def call(self, inputs):
         targets = None
         targets, mask, logits, r = inputs
@@ -422,19 +619,39 @@ class NegativeMultinomialEndpoint(layers.Layer):
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           negative_multinomial_likelihood(targets, mask, logits, r)
+                           mask * negative_multinomial_likelihood(targets, logits, r)
                          )
             self.add_loss(reconstruction_loss)
 
             tf.debugging.check_numerics(reconstruction_loss,
                                         "NegativeMultinomialEndpoint NaN")
 
-        p = softmax1p_mask(logits, mask)
-        p0 = softmax1p0_mask(logits, mask)
+        p = softmax1p(logits)
+        p0 = softmax1p0(logits)
         return p * r / (p0 + 1e-10)
 
 
+class DirichletMultinomialEndpoint(layers.Layer):
+    """ Dirichlet-multinomial-endpoint """
+    def call(self, inputs):
+        targets = None
+        targets, mask, mul_logits, alphasum = inputs
+
+        if targets is not None:
+
+            reconstruction_loss = -tf.reduce_mean(
+                           mask * dirichlet_multinomial_likelihood(targets, mul_logits, alphasum)
+                         )
+            self.add_loss(reconstruction_loss)
+
+            tf.debugging.check_numerics(reconstruction_loss,
+                                        "DirichletMultinomialEndpoint NaN")
+
+        p = _softmax(mul_logits) * alphasum
+        return p
+
 class NegativeMultinomialEndpointV2(layers.Layer):
+    """ Negative multinomial-endpoint """
     def call(self, inputs):
         targets = None
         targets, mask, mul_logits, p0_logit, r = inputs
@@ -442,7 +659,7 @@ class NegativeMultinomialEndpointV2(layers.Layer):
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           negative_multinomial_likelihood_v2(targets, mask, mul_logits, p0_logit, r)
+                           mask * negative_multinomial_likelihood_v2(targets, mul_logits, p0_logit, r)
                          )
             self.add_loss(reconstruction_loss)
 
@@ -454,12 +671,10 @@ class NegativeMultinomialEndpointV2(layers.Layer):
 
         f = p1*r/p0
         pm = _softmax(mul_logits)
-        return pm *f
-
-        #return p * r / (p0 + 1e-10)
+        return pm * f
 
 class MixtureModelEndpoint(layers.Layer):
-
+    """ General mixture model-endpoint """
     def __init__(self, model, *args, **kwargs):
         self.model = model
         if model == 'gaussian':
@@ -490,12 +705,32 @@ class MixtureModelEndpoint(layers.Layer):
         if targets is not None:
             inp = (targets, mask,) + tuple(params)
             reconstruction_loss = -tf.reduce_mean(
-                           tf.math.reduce_sum(mask * tf.math.reduce_logsumexp(self.likelihood(*inp) + tf.math.log_softmax(pi) - tf.math.log(1e5), axis=-1), -1)
+                          tf.math.reduce_sum(mask * tf.math.reduce_logsumexp(self.likelihood(*inp) + tf.math.log_softmax(pi) - tf.math.log(1e5), axis=-1), -1)
                          )
             self.add_loss(reconstruction_loss)
 
             tf.debugging.check_numerics(reconstruction_loss,
                                         "MixtureModel NaN")
         mu = self.mean(*params)
-        pred = mixture_predict(pi, mu)
+        pred = mixture_mean(pi, mu)
         return pred
+
+# defining all custom classes for reloading
+CUSTOM_OBJECTS = {'Sampling': Sampling,
+                  'KLlossLayer': KLlossLayer,
+                  'ClipLayer': ClipLayer,
+                  'MSEEndpoint': MSEEndpoint,
+                  'MultinomialEndpoint': MultinomialEndpoint,
+                  'BinomialEndpoint': BinomialEndpoint,
+                  'PoissonEndpoint': PoissonEndpoint,
+                  'NegativeBinomialEndpoint': NegativeBinomialEndpoint,
+                  'ZeroInflatedNegativeBinomialEndpoint': ZeroInflatedNegativeBinomialEndpoint,
+                  'NegativeMultinomialEndpoint': NegativeMultinomialEndpoint,
+                  'NegativeMultinomialEndpointV2': NegativeMultinomialEndpointV2,
+                  'MutInfoLayer': MutInfoLayer,
+                  'MixtureModelEndpoint':MixtureModelEndpoint,
+                  'JointMean': JointMean,
+                  'JointSigma': JointSigma,
+                  #'NanToZero': NanToZero,
+                 }
+
