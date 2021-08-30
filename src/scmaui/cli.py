@@ -34,48 +34,59 @@ import logging
 def main(args=None):
 
     parser = argparse.ArgumentParser('scmaui',
-                                     description=f'Negative multinomial variational auto-encoders - v{__version__}')
+                                     description=f'Single-cell multi-omics integration using variational auto-encoders - v{__version__}')
 
+    # input data
     parser.add_argument('-data', dest='data', type=str,
-                        nargs='+', help="One or more h5ad datasets each one containing one input modality. If no -outdata is provided the input data serves as output data for an auto-encoding model.", required=True)
+                        nargs='+', help="One or more h5ad datasets containing one input modality each. "
+                                        "If no -outdata is provided the input data serves as output data for an auto-encoding model.",
+                        required=True)
     parser.add_argument('-datanames', dest='datanames', nargs='*',
-                        help='Names of the modalities.')
-    parser.add_argument('-outdata', dest='outdata', type=str,
-                        nargs='*', help="One or more h5ad datasets each one containing one output modality.")
-    parser.add_argument('-outdatanames', dest='outdatanames', nargs='*',
-                        help='Names of the output modalities.')
+                        help='Associated names of the input modalities.')
 
+    # optional output data
+    parser.add_argument('-outdata', dest='outdata', type=str,
+                        nargs='*', help="(optional) One or more h5ad datasets containing one output modality each."
+                         "If outdata is not specified, then the input datasets serve as output data as well for an auto-encoder."
+                         "Otherwise, cross-modality prediction can be trained using the separate output datasets.")
+    parser.add_argument('-outdatanames', dest='outdatanames', nargs='*',
+                        help='Associated names of the output modalities.')
+
+    # reconstruction loss
     parser.add_argument('-loss', dest='loss', type=str, nargs='+',
-                        default='mse', choices=['mul', 'mse', 'binary', 'poisson',
-                                                'negmul', 'negmul2', 'zinb', 'mixgaussian', 'negbinom', 'gamma', 'mixgamma',
+                        choices=['mul', 'mse', 'binary', 'poisson',
+                                                'negmul', 'negmul2', 'zinb',
+                                                'dirmul',
+                                                'mixgaussian', 'negbinom', 'gamma', 'mixgamma',
                                                ],
-                        help="Loss associated with each modality.")
+                        help="Available reconstruction losses.", required=True)
+
+    # output directory
     parser.add_argument('-output', dest='output', type=str,
                         help="Output directory", required=True)
 
 
+    # optional model parameters and hyper-parameters
     parser.add_argument('-nlatent', dest='nlatent', type=int, default=10,
                         help="Latent dimensions. Default: 10")
 
     parser.add_argument('-epochs', dest='epochs', type=int, default=100,
                         help="Number of epochs. Default: 100.")
     parser.add_argument('-nrepeat', '-nmodels', '-ensemblesize', dest='nrepeat', type=int, default=1,
-                        help="Number of repeatedly fitted models. "
+                        help="Ensemble size. "
                              "Default: 1.")
     parser.add_argument('-batch_size', dest='batch_size', type=int,
                         default=128,
                         help='Batch size. Default: 128.')
-    parser.add_argument('-overwrite', dest='overwrite',
-                        action='store_true', default=False)
+    #parser.add_argument('-overwrite', dest='overwrite',
+    #                    action='store_true', default=False)
     parser.add_argument('-evaluate', dest='evaluate',
-                        action='store_true', default=False)
+                        action='store_true', default=False,
+                        help="Whether to evaluate an existing model. Default: False.")
     parser.add_argument('-skip_outliers', dest='skip_outliers',
                         action='store_true', default=False,
                         help='Skip models with outlier loss (aka poor local optimum)')
 
-    parser.add_argument('-nlayers_d', dest='nlayers_d', type=int,
-                        default=1,
-                        help="Number of decoder hidden layers. Default: 1.")
     parser.add_argument('-nhidden_e', dest='nhidden_e', type=int,
                         default=32,
                         help="Number of neurons per encoder layer. "
@@ -89,6 +100,9 @@ def main(args=None):
                              "Usually it is important to set nhidden_d as well as nlatent to relatively small values. "
                              " Too high numbers for these parameters degrades the quality of the latent features. "
                              "Default: 16.")
+    parser.add_argument('-nlayers_d', dest='nlayers_d', type=int,
+                        default=1,
+                        help="Number of decoder hidden layers. Default: 1.")
     parser.add_argument('-inputdropout', dest='inputdropout', type=float,
                         default=0.0,
                         help="Dropout rate applied at the inital layer (e.g. input accessibility profile). Default=0.15")
@@ -99,23 +113,27 @@ def main(args=None):
                         default=0.0,
                         help="Dropout applied after each decoder hidden layer. Default=0.3")
     parser.add_argument("-feature_fraction", dest="feature_fraction", type=float, default=1.,
-                        help="Whether to use a random subset of features. feature_fraction determines the proportion of features to use. Default=1.")
+                        help="(currently unused) Whether to use a random subset of features. feature_fraction determines the proportion of features to use. Default=1.")
 
     parser.add_argument("-adversarial", dest="adversarial", type=str, nargs='+', default=[],
-                        help="Batch names in the anndata dataset. ")
+                        help="Adversarial labels. This should be a sample/cell-annotation column in one of the input dataset. "
+                         "Adversarial model uses a mean-squared error against numerical labels and a categorical cross-entropy "
+                         "error against categorical features.")
 
     parser.add_argument("-conditional", dest="conditional", type=str, nargs='+', default=[],
-                        help="Batch names in the anndata dataset. ")
+                        help="Conditional covariates. This should be a sample/cell-annotation column in one of the input dataset. "
+                        "Categorical or numerical covariates are supported.")
 
+    # for testing other model architectures
     parser.add_argument("-modelname", dest="modelname", type=str, default='vae', choices=[
-                                                                                          'scmaui-0', 'scmaui',
-                                                                                          'bcvae', 'bcvae2',
+                                                                                          #'scmaui-0', 'scmaui',
+                                                                                          #'bcvae', 'bcvae2',
                                                                                            'vae',
-                                                                                           'cond-vae',
-                                                                                           'regout-vae',
-                                                                                           'vae-ml',
+                                                                                          # 'cond-vae',
+                                                                                          # 'regout-vae',
+                                                                                          # 'vae-ml',
                                                                                          ],
-                        help="Model name for batch correction. Default: vae")
+                        help="Model architectures. Default: vae")
     parser.add_argument('-resolution', dest='resolution', type=float, default=1.,
                         help="Resolution for Louvain clustering analysis.")
 
@@ -143,8 +161,6 @@ def main(args=None):
 
     params = get_model_params(dataset, args=args)
 
-    #params.update(get_dataset_params(dataset))
-    #params.update(get_loss_params())
     metamodel = EnsembleVAE(params,
                             args.nrepeat, 
                             args.modelname,
