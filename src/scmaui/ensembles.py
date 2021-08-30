@@ -22,7 +22,7 @@ class EnsembleVAE:
     ----------
     params : dict
         Model parameters
-    repeats : int
+    ensemble_size : int
         Ensemble size. Default=1
     model : str
         Model name. Currently not in use.
@@ -30,8 +30,8 @@ class EnsembleVAE:
         Subset fraction of features for ensemble training. Currently not in use.
     """
 
-    def __init__(self, params, repeats=1, model=None, feature_fraction=1.):
-        self.repeats = repeats
+    def __init__(self, params, ensemble_size=1, model=None, feature_fraction=1.):
+        self.ensemble_size = ensemble_size
         self.models = []
 
         self.space = params
@@ -65,14 +65,14 @@ class EnsembleVAE:
     def save(self, path, overwrite=False):
         """ save the ensemble """
         for r, model in enumerate(self.models):
-            subpath = os.path.join(path, f'repeat_{r+1}')
+            subpath = os.path.join(path, f'model_{r+1}')
             os.makedirs(subpath, exist_ok=True)
             model.save(os.path.join(subpath, 'model', 'vae.h5'))
 
     def load(self, path):
         """ load a previously trained ensemble """
-        for r in range(self.repeats):
-            subpath = os.path.join(path, f'repeat_{r+1}')
+        for r in range(self.ensemble_size):
+            subpath = os.path.join(path, f'model_{r+1}')
             if not os.path.exists(os.path.join(subpath, 'model')):
                 print(f'no model in {subpath}')
                 print('re-load model')
@@ -91,10 +91,10 @@ class EnsembleVAE:
         space = self.space
         histories = []
 
-        for r in range(self.repeats):
+        for r in range(self.ensemble_size):
             tf_X, tf_X_test = dataset.training_data(batch_size=batch_size, validation_split=0.15)
 
-            print(f'Run repetition {r+1}')
+            print(f'Run model {r+1}')
             space.update(dataset.shapes())
             model = self._create(self.model, space)
 

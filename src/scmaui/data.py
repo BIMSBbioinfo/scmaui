@@ -93,7 +93,25 @@ def load_data_(data, names):
     return adata
 
 def load_data(data, names, outdata=None, outnames=None):
-    """ Helper function to load input and output anndata objects """
+    """ Helper function to load input and output anndata objects 
+
+    Parameters
+    ----------
+    data : list(str)
+       List of paths pointing to h5ad input datasets.
+    names : list(str)
+       List of output dataset names.
+    outdata : list(str) or None
+       Optional list of paths pointing to h5ad output datasets.
+       If not specified, output datasets are equal to input data.
+    outnames : list(str) or None
+       Optional list of output dataset names.
+
+    Returns
+    -------
+    dict(input=list(AnnData), output=list(AnnData))
+        Dictionary containing input and output datasets.
+    """
     if outdata is None:
         outdata, outnames = data, names
 
@@ -233,7 +251,28 @@ def _intersect(adata):
 
 
 class SCDataset:
-    """ Multi-modal dataset generator """
+    """ Multi-modal dataset generator 
+
+    Parameters
+    ----------
+    adata : dict(input=list(AnnData), output=list(AnnData))
+        Dictionary of input and output datasets in AnnData format.
+    losses : list(str)
+        List of losses, one per output modality.
+    adversarial : list(str) or None
+        List of adversarial label names. These labels should correspond
+        to a sample annotation column in at least one input/output dataset.
+        Default: None
+    conditional : list(str) or None
+        List of conditional covariate names. Covariates should correspond
+        to a sample annotation column in at least one input/output dataset.
+        Default: None
+    union : bool
+        Indicates whether non-overlapping samples/cells across multiple datasets
+        should be used. If True, missing samples/cells are marked accordingly.
+        If False, non-overlapping cells are removed and only overlapping cells are considered.
+        Default: True. 
+    """
     def __init__(self, adata, losses, adversarial=None, conditional=None, union=True):
         adata = copy.deepcopy(adata)
         self.union = union
@@ -264,7 +303,7 @@ class SCDataset:
         return str(self)
 
     def subset(self, cellids):
-        """ get a subset of the dataset based on a list of sample/cell ids """
+        """ returns a subset of the dataset based on a list of sample/cell ids """
         adata = {k: [ada[cellids,:].copy() for ada in self.adata[k]] for k in self.adata}
         return SCDataset(adata, self.losses, adversarial=self.adversarial,
                          conditional=self.conditional, union=self.union)
@@ -276,7 +315,7 @@ class SCDataset:
                          conditional=self.conditional, union=self.union)
 
     def sample(self, N):
-        """ get a random sample dataset containing N cells """
+        """ returns a random sample dataset containing N cells """
         rcellids = np.random.choice(self.adata['input'][0].obs.index.tolist(), N, replace=False)
         return self.subset(rcellids)
 
@@ -325,6 +364,7 @@ class SCDataset:
         return self.size()
 
     def training_data(self, batch_size=64, validation_split=0.15, as_tf_data=True):
+        """ returns a tensorflow.data.Dataset for training """
         # unpack the data
         X, mask_x, Y, mask_y, advlabel, condlabel, _, _ = self._get_input_output_data(self.adata)
 
@@ -353,6 +393,7 @@ class SCDataset:
         return tf_X, tf_X_test
 
     def evaluation_data(self, batch_size=64, as_tf_data=True):
+        """ returns a tensorflow.data.Dataset for evaluating the encoder """
 
         X, mask_x, _, _, alabel, condlabel, _, _ = self._get_input_output_data(self.adata, dummy_labels=True)
 
@@ -363,6 +404,7 @@ class SCDataset:
         return tf_X
 
     def imputation_data(self, batch_size=64, as_tf_data=True):
+        """ returns a tensorflow.data.Dataset for evaluating the vae for imputation """
 
         X, mask_x, Y, mask_y, alabel, condlabel, _, _ = self._get_input_output_data(self.adata, dummy_labels=True)
 

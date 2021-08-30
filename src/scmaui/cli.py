@@ -72,7 +72,7 @@ def main(args=None):
 
     parser.add_argument('-epochs', dest='epochs', type=int, default=100,
                         help="Number of epochs. Default: 100.")
-    parser.add_argument('-nrepeat', '-nmodels', '-ensemblesize', dest='nrepeat', type=int, default=1,
+    parser.add_argument('-ensemble_size', dest='ensemble_size', type=int, default=1,
                         help="Ensemble size. "
                              "Default: 1.")
     parser.add_argument('-batch_size', dest='batch_size', type=int,
@@ -162,7 +162,7 @@ def main(args=None):
     params = get_model_params(dataset, args=args)
 
     metamodel = EnsembleVAE(params,
-                            args.nrepeat, 
+                            args.ensemble_size, 
                             args.modelname,
                             args.feature_fraction,)
 
@@ -177,7 +177,7 @@ def main(args=None):
     latent, latent_list = metamodel.encode(dataset, skip_outliers=args.skip_outliers)
 
     for i, ldf in enumerate(latent_list):
-        ldf.to_csv(os.path.join(args.output, f'repeat_{i+1}', 'latent.csv'))
+        ldf.to_csv(os.path.join(args.output, f'model_{i+1}', 'latent.csv'))
     latent.to_csv(os.path.join(args.output, 'latent.csv'))
 
     oadata = combine_modalities(dataset.adata['input'])
