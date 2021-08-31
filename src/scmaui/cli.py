@@ -188,7 +188,5 @@ def main(args=None):
     sc.tl.louvain(adata, resolution=args.resolution)
     sc.tl.umap(adata)
 
-    if 'batchnames' not in params:
-        params['batchnames'] = None
     adata.write(os.path.join(args.output, "analysis.h5ad"), compression='gzip')
     print('saved to ' + os.path.join(args.output, "analysis.h5ad"))
