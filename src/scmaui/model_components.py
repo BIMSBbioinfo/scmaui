@@ -22,19 +22,19 @@ def resnet_block(x0, x):
 
 def create_modality_encoder(inputs, cond, params):
     """ build a modality-specific encoder """
-    latent_dim = params['latentdims']
-    nhidden_e = params['nhidden_e']
+    latent_dim = params['nlatent']
+    nhidden_e = params['nunits_encoder']
     hidden = []
     x = inputs
 
-    x = layers.Dropout(params['inputdropout'])(x)
+    x = layers.Dropout(params['dropout_input'])(x)
 
     x = layers.Dense(nhidden_e, activation="elu")(x)
     if cond is not None:
         x = layers.Concatenate()([x, cond])
     hidden.append(x)
     x0 = x
-    for i in range(params['nlayers_e']):
+    for i in range(params['nlayers_encoder']):
         x = resnet_block(x0, x)
 
         hidden.append(x)
@@ -49,7 +49,7 @@ def create_encoder_base(params):
     """ Build encoders for all modalities and combine them. """
     # configs
     input_shape = params['inputdims']
-    mode_names = params['inputmodality']
+    mode_names = params['input_modality']
 
     # inputs and modality masks
     inputs = tuple([keras.Input(shape=(inp,), name='modality_' + name) for inp, name in zip(input_shape, mode_names)])
@@ -60,7 +60,7 @@ def create_encoder_base(params):
                                      name='condinput_'+name) for name, ncat \
                                      in zip(params['conditional_name'],
                                             params['conditional_dim'])])
-    conditional_ = _concatenate(conditional)
+    covariates = _concatenate(conditional)
 
     # adversarial inputs
     adversarial = tuple([keras.Input(shape=(ncat,),
@@ -74,7 +74,7 @@ def create_encoder_base(params):
     z_log_vars = []
     z_samples = []
     for inp in inputs:
-        hidden, z_mean, z_log_var = create_modality_encoder(inp, conditional_, params)
+        hidden, z_mean, z_log_var = create_modality_encoder(inp, covariates, params)
         hiddens += hidden
         z_means.append(z_mean)
         z_log_vars.append(z_log_var)
@@ -88,6 +88,8 @@ def create_encoder_base(params):
  
     outputs = [z]
     if len(adversarial) > 0:
+        # if adversarial labels are available, add
+        # a discriminator on top of the latent features.
         loss = get_adversarial_net(z_means, masks, adversarial, params)
         outputs.append(loss)
 
@@ -112,9 +114,9 @@ def regressout(x, b, nhidden):
 def create_decoder_base(params):
     """ build decoders for all modalities """
     input_shape = params['outputdims']
-    latent_dim = params['latentdims']
+    latent_dim = params['nlatent']
     losses = params['losses']
-    mode_names = params['outputmodality']
+    mode_names = params['output_modality']
 
     latent_inputs = keras.Input(shape=(latent_dim,), name='latent_input')
 
@@ -136,39 +138,39 @@ def create_decoder_base(params):
                          in zip(params['adversarial_name'],\
                                 params['adversarial_dim'])])
     covariates = intercept + conditional + adversarial
-    batches = _concatenate(covariates)
+    covariates = _concatenate(covariates)
 
     outputs = [create_modality_decoder(params,
                                        latent_inputs,
                                        target,
                                        mask,
-                                       batches,
+                                       covariates,
                                        loss) for target, mask, loss in zip(targets, masks, losses)]
 
     decoder = keras.Model((latent_inputs, targets, masks, intercept, conditional, adversarial,), outputs, name="decoder")
 
     return decoder
 
-def create_modality_decoder(params, latent, target, mask, batch, loss):
+def create_modality_decoder(params, latent, target, mask, covariates, loss):
     """ build a modality specific decoder """
     x = latent
-    x = layers.Concatenate()([latent, batch])
+    x = layers.Concatenate()([latent, covariates])
 
-    for nhidden in range(params['nlayers_d']):
-        x = layers.Dense(params['nhiddendecoder'], activation="elu")(x)
-        x = layers.Dropout(params['hidden_d_dropout'])(x)
+    for nhidden in range(params['nlayers_decoder']):
+        x = layers.Dense(params['nunits_decoder'], activation="elu")(x)
+        x = layers.Dropout(params['dropout_decoder'])(x)
 
     target_ = target
     mask_ = mask
 
     logits = layers.Dense(target.shape[1], activation='linear')(x)
     
-    batch_logits = layers.Dense(target.shape[1], activation='linear')(batch)
-    logits = layers.Add()([logits, batch_logits])
+    covariate_logits = layers.Dense(target.shape[1], activation='linear')(covariates)
+    logits = layers.Add()([logits, covariate_logits])
 
     if loss == 'negmul':
 
-        r = layers.Dense(1, activation='linear')(batch)
+        r = layers.Dense(1, activation='linear')(covariates)
         r = layers.Activation(activation=tf.math.softplus)(r)
         r = ClipLayer(1e-10, 1e5)(r)
 
@@ -177,8 +179,8 @@ def create_modality_decoder(params, latent, target, mask, batch, loss):
     elif loss == 'negmul2':
 
         logits_mul = logits
-        logits_nb = layers.Dense(1, activation='linear')(batch)
-        r = layers.Dense(1, activation='linear')(batch)
+        logits_nb = layers.Dense(1, activation='linear')(covariates)
+        r = layers.Dense(1, activation='linear')(covariates)
         r = layers.Activation(activation=tf.math.softplus)(r)
         r = ClipLayer(1e-10, 1e5)(r)
 
@@ -187,7 +189,7 @@ def create_modality_decoder(params, latent, target, mask, batch, loss):
     elif loss == 'dirmul':
 
         logits_mul = logits
-        alphasum = layers.Dense(1, activation='linear')(batch)
+        alphasum = layers.Dense(1, activation='linear')(covariates)
         alphasum = layers.Activation(activation=tf.math.softplus)(r)
 
         prob_loss = DirichletMultinomialEndpoint()([target_, mask_, logits_mul, musum])
@@ -212,7 +214,7 @@ def create_modality_decoder(params, latent, target, mask, batch, loss):
 
     elif loss == 'negbinom':
 
-        r = layers.Dense(1, activation='linear')(batch)
+        r = layers.Dense(1, activation='linear')(covariates)
         r = layers.Activation(activation=tf.math.softplus)(r)
         r = ClipLayer(1e-10, 1e5)(r)
 
@@ -220,7 +222,7 @@ def create_modality_decoder(params, latent, target, mask, batch, loss):
 
     elif loss == 'zinb':
 
-        r = layers.Dense(1, activation='linear')(batch)
+        r = layers.Dense(1, activation='linear')(covariates)
         r = layers.Activation(activation=tf.math.softplus)(r)
         r = ClipLayer(1e-10, 1e5)(r)
 
@@ -272,12 +274,12 @@ def get_loss(t, mask, p, ptype):
         loss = mask * tf.reduce_sum(losses, axis=-1, keepdims=True)
     return loss
 
-def batch_predictor(layer, mask, targets, params, idx):
+def adversarial_predictor(layer, mask, targets, params, idx):
     """ build an adversarial network on top of layer """
     x = layer
     
-    for i in range(params['nlayersbatcher']):
-       x = layers.Dense(params['nhiddenbatcher'], activation='elu', name=f'advnet_{idx}1{i}')(x)
+    for i in range(params['nlayers_adversary']):
+       x = layers.Dense(params['nhidden_adversary'], activation='elu', name=f'advnet_{idx}1{i}')(x)
        #x = layers.BatchNormalization(name=f'advnet_{idx}2{i}')(x)
     pred_targets = [layers.Dense(dim, activation=_getlabel(ptype),
                                  name=f'advnet_out_{idx}' + bname)(x) \
@@ -295,7 +297,7 @@ def batch_predictor(layer, mask, targets, params, idx):
 
 def get_adversarial_net(layers, masks, targets, params):
     """ aggregate loss from all adversarial network modules """
-    ret = [batch_predictor(layer, mask, targets, params, idx) for idx, (layer, mask) in enumerate(zip(layers, masks))]
+    ret = [adversarial_predictor(layer, mask, targets, params, idx) for idx, (layer, mask) in enumerate(zip(layers, masks))]
     losses = tf.math.reduce_sum(tf.math.add_n([r for r in ret]))
 
     return losses

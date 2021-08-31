@@ -75,14 +75,15 @@ class EnsembleVAE:
             subpath = os.path.join(path, f'model_{r+1}')
             if not os.path.exists(os.path.join(subpath, 'model')):
                 print(f'no model in {subpath}')
-                print('re-load model')
-                model = self._load(os.path.join(subpath, 'model', 'vae.h5'))
-                model.compile(optimizer=
-                              keras.optimizers.Adam(
-                                  learning_rate=0.001,
-                                  amsgrad=True)
-                             )
-                self.models.append(model)
+
+            print('re-load model')
+            model = self._load(os.path.join(subpath, 'model', 'vae.h5'))
+            model.compile(optimizer=
+                          keras.optimizers.Adam(
+                              learning_rate=0.001,
+                              amsgrad=True)
+                         )
+            self.models.append(model)
 
     def fit(self, dataset,
             shuffle=True, batch_size=64,
@@ -181,8 +182,8 @@ class EnsembleVAE:
 
         model = self.models[modelid].encoder_mean.model
         fidx =0
-        ig_total = [np.zeros((d, self.space['latentdims'])) for d in self.space['inputdims']]
-        for fidx in range(self.space['latentdims']):
+        ig_total = [np.zeros((d, self.space['nlatent'])) for d in self.space['inputdims']]
+        for fidx in range(self.space['nlatent']):
              grads = compute_gradients(model, X, mask, cond, fidx)
              # grads dims are equal to input dims
              igrads = [dx * 1/S* tf.reduce_sum(tf.reshape(g, (S,-1,n.shape[-1])), axis=0) \

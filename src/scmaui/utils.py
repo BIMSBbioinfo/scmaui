@@ -13,17 +13,16 @@ from sklearn.preprocessing import OneHotEncoder
 def init_model_params():
     params = OrderedDict(
       [
-        ('nhidden_e', 32),
-        ('nlayers_e', 5),
-        ('nhiddendecoder', 20),
-        ('nlayers_d', 1),
-        ('inputdropout', 0.1),
-        ('hidden_e_dropout', 0.0),
-        ('hidden_d_dropout', 0.0),
-        ('nhiddenbatcher', 128),
-        ('nlayersbatcher', 2),
-        ('nlasthiddenbatcher', 5),
-        ('latentdims', 10),
+        ('nunits_encoder', 32),
+        ('nlayers_encoder', 5),
+        ('nunits_decoder', 20),
+        ('nlayers_decoder', 1),
+        ('dropout_input', 0.1),
+        ('dropout_encoder', 0.0),
+        ('dropout_decoder', 0.0),
+        ('nunits_adversary', 128),
+        ('nlayers_adversary', 2),
+        ('nlatent', 10),
         ('nmixcomp', 1),
       ]
     )
@@ -34,8 +33,8 @@ def get_model_params(dataset, args=None):
     params = init_model_params()
 
     modalities = dataset.modalities()
-    params['inputmodality'] = modalities[0]
-    params['outputmodality'] = modalities[1]
+    params['input_modality'] = modalities[0]
+    params['output_modality'] = modalities[1]
 
     params.update(dataset.adversarial_config())
     params.update(dataset.conditional_config())
@@ -45,17 +44,16 @@ def get_model_params(dataset, args=None):
 
         nparams = OrderedDict(
           [
-            ('nlayers_d', args.nlayers_d),
-            ('nhidden_e', args.nhidden_e),
-            ('nlayers_e', args.nlayers_e),
-            ('nhiddendecoder', args.nhidden_d),
-            ('inputdropout', args.inputdropout),
-            ('hidden_e_dropout', args.hidden_e_dropout),
-            ('hidden_d_dropout', args.hidden_d_dropout),
-            ('nhiddenbatcher', args.nhidden_b),
-            ('nlayersbatcher', 2),
-            ('nlasthiddenbatcher', 5),
-            ('latentdims', args.nlatent),
+            ('nlayers_encoder', args.nlayers_encoder),
+            ('nunits_encoder', args.nhidden_encoder),
+            ('nlayers_decoder', args.nlayers_decoder),
+            ('nunits_decoder', args.nhidden_decoder),
+            ('dropout_input', args.dropout_input),
+            ('dropout_encoder', args.dropout_encoder),
+            ('dropout_decoder', args.dropout_decoder),
+            ('nunits_adversary', args.nhidden_adversary),
+            ('nlayers_adversary', 2),
+            ('nlatent', args.nlatent),
             ('losses', args.loss),
             ('nmixcomp', args.nmixcomp),
           ]

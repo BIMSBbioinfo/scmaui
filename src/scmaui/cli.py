@@ -74,7 +74,7 @@ def main(args=None):
     parser.add_argument('-ensemble_size', dest='ensemble_size', type=int, default=1,
                         help="Ensemble size. "
                              "Default: 1.")
-    parser.add_argument('-batch_size', dest='batch_size', type=int,
+    parser.add_argument('-batch_size', '-bs', dest='batch_size', type=int,
                         default=128,
                         help='Batch size. Default: 128.')
     #parser.add_argument('-overwrite', dest='overwrite',
@@ -86,29 +86,29 @@ def main(args=None):
                         action='store_true', default=False,
                         help='Skip models with outlier loss (aka poor local optimum)')
 
-    parser.add_argument('-nhidden_e', dest='nhidden_e', type=int,
+    parser.add_argument('-nunits_e', '-nunits_encoder', '-nue', dest='nhidden_encoder', type=int,
                         default=32,
                         help="Number of neurons per encoder layer. "
                              "This number is constant across the encoder. Default: 512.")
-    parser.add_argument('-nlayers_e', dest='nlayers_e', type=int,
+    parser.add_argument('-nlayers_e', '-nlayers_encoder', '-nle', dest='nlayers_encoder', type=int,
                         default=2,
                         help="Number of residual blocks for the encoder. Default: 20.")
-    parser.add_argument('-nhidden_d', dest='nhidden_d', type=int,
+    parser.add_argument('-nunits_d', '-nunits_decoder', '-nud', dest='nunits_decoder', type=int,
                         default=16,
                         help="Number of neurons per decoder hidden layer. "
                              "Usually it is important to set nhidden_d as well as nlatent to relatively small values. "
                              " Too high numbers for these parameters degrades the quality of the latent features. "
                              "Default: 16.")
-    parser.add_argument('-nlayers_d', dest='nlayers_d', type=int,
+    parser.add_argument('-nlayers_d', '-nlayers_decoder', '-nld', dest='nlayers_decoder', type=int,
                         default=1,
                         help="Number of decoder hidden layers. Default: 1.")
-    parser.add_argument('-inputdropout', dest='inputdropout', type=float,
+    parser.add_argument('-dropout_input', dest='dropout_input', type=float,
                         default=0.0,
                         help="Dropout rate applied at the inital layer (e.g. input accessibility profile). Default=0.15")
-    parser.add_argument("-hidden_e_dropout", dest="hidden_e_dropout", type=float,
+    parser.add_argument("-dropout_encoder", dest="dropout_encoder", type=float,
                         default=0.0,
                         help="Dropout applied in each residual block of the encoder. Default=0.3")
-    parser.add_argument("-hidden_d_dropout", dest="hidden_d_dropout", type=float,
+    parser.add_argument("-dropout_decoder", dest="dropout_decoder", type=float,
                         default=0.0,
                         help="Dropout applied after each decoder hidden layer. Default=0.3")
     parser.add_argument("-feature_fraction", dest="feature_fraction", type=float, default=1.,
@@ -132,12 +132,12 @@ def main(args=None):
                                                                                           # 'regout-vae',
                                                                                           # 'vae-ml',
                                                                                          ],
-                        help="Model architectures. Default: vae")
+                        help="(Currently unused) Model architectures. Default: vae")
     parser.add_argument('-resolution', dest='resolution', type=float, default=1.,
                         help="Resolution for Louvain clustering analysis.")
 
 
-    parser.add_argument('-nhidden_b', dest='nhidden_b', type=int,
+    parser.add_argument('-nunits_adversary', dest='nunits_adversary', type=int,
                         default=32,
                         help="Number of hidden neurons for batch predictor. "
                              "Default: 32.")
