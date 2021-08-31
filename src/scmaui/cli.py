@@ -53,7 +53,7 @@ def main(args=None):
                         help='Associated names of the output modalities.')
 
     # reconstruction loss
-    parser.add_argument('-loss', dest='loss', type=str, nargs='+',
+    parser.add_argument('-loss', '-losses', dest='loss', type=str, nargs='+',
                         choices=['mul', 'mse', 'binary', 'poisson',
                                                 'negmul', 'negmul2', 'zinb',
                                                 'dirmul',
@@ -147,7 +147,6 @@ def main(args=None):
                         help="Number of components for mixture models. Default: 2.")
 
     args = parser.parse_args()
-
     data = args.data
     datanames = args.datanames
     outdata = args.outdata
@@ -156,7 +155,7 @@ def main(args=None):
     # load the dataset
     adatas = load_data(data, datanames, outdata, outdatanames)
 
-    dataset = SCDataset(adatas, args.adversarial, args.conditional)
+    dataset = SCDataset(adatas, losses=args.loss, adversarial=args.adversarial, conditional=args.conditional, union=True)
     print(dataset)
 
     params = get_model_params(dataset, args=args)
