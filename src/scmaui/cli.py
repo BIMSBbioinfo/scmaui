@@ -26,7 +26,6 @@ from scmaui.data import load_data
 from scmaui.data import SCDataset
 from scmaui.data import combine_modalities
 from scmaui.utils import get_model_params
-from scmaui.utils import get_variable_regions
 import scanpy as sc
 import logging
 
