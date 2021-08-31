@@ -126,8 +126,8 @@ class VAE(tf.keras.Model):
             else:
                 z = ret
 
-            for i, l in enumerate(self.encoder.losses):
-                losses[f'encl{i}']=l
+            #for i, l in enumerate(self.encoder.losses):
+            #    losses[f'encl{i}']=l
             losses['kl'] = sum(self.encoder.losses)
 
             pred = self.decoder([z, odata, omask, intercept, conditional, adversarial], training=True)
