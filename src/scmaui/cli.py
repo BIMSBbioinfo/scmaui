@@ -82,9 +82,6 @@ def main(args=None):
     parser.add_argument('-evaluate', dest='evaluate',
                         action='store_true', default=False,
                         help="Whether to evaluate an existing model. Default: False.")
-    parser.add_argument('-skip_outliers', dest='skip_outliers',
-                        action='store_true', default=False,
-                        help='Skip models with outlier loss (aka poor local optimum)')
 
     parser.add_argument('-nunits_e', '-nunits_encoder', '-nue', dest='nunits_encoder', type=int,
                         default=32,
@@ -172,7 +169,7 @@ def main(args=None):
     else:
         metamodel.load(args.output)
 
-    latent, latent_list = metamodel.encode(dataset, skip_outliers=args.skip_outliers)
+    latent, latent_list = metamodel.encode(dataset)
 
     for i, ldf in enumerate(latent_list):
         ldf.to_csv(os.path.join(args.output, f'model_{i+1}', 'latent.csv'))

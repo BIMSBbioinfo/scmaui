@@ -110,7 +110,7 @@ class EnsembleVAE:
             self.models.append(model)
         return histories
 
-    def encode_full(self, dataset, batch_size=64, skip_outliers=True):
+    def encode_full(self, dataset, batch_size=64):
         tf_X = dataset.evaluation_data(batch_size=batch_size)
         dfs = []
         for i, model in enumerate(self.models):
