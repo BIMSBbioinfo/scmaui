@@ -108,8 +108,6 @@ def main(args=None):
     parser.add_argument("-dropout_decoder", dest="dropout_decoder", type=float,
                         default=0.0,
                         help="Dropout applied after each decoder hidden layer. Default=0.3")
-    parser.add_argument("-feature_fraction", dest="feature_fraction", type=float, default=1.,
-                        help="(currently unused) Whether to use a random subset of features. feature_fraction determines the proportion of features to use. Default=1.")
 
     parser.add_argument("-adversarial", dest="adversarial", type=str, nargs='+', default=[],
                         help="Adversarial labels. This should be a sample/cell-annotation column in one of the input dataset. "
@@ -121,15 +119,15 @@ def main(args=None):
                         "Categorical or numerical covariates are supported.")
 
     # for testing other model architectures
-    parser.add_argument("-modelname", dest="modelname", type=str, default='vae', choices=[
-                                                                                          #'scmaui-0', 'scmaui',
-                                                                                          #'bcvae', 'bcvae2',
-                                                                                           'vae',
-                                                                                          # 'cond-vae',
-                                                                                          # 'regout-vae',
-                                                                                          # 'vae-ml',
-                                                                                         ],
-                        help="(Currently unused) Model architectures. Default: vae")
+    #parser.add_argument("-modelname", dest="modelname", type=str, default='vae', choices=[
+    #                                                                                      #'scmaui-0', 'scmaui',
+    #                                                                                      #'bcvae', 'bcvae2',
+    #                                                                                       'vae',
+    #                                                                                      # 'cond-vae',
+    #                                                                                      # 'regout-vae',
+    #                                                                                      # 'vae-ml',
+    #                                                                                     ],
+    #                    help="(Currently unused) Model architectures. Default: vae")
     parser.add_argument('-resolution', dest='resolution', type=float, default=1.,
                         help="Resolution for Louvain clustering analysis.")
 
@@ -156,10 +154,7 @@ def main(args=None):
 
     params = get_model_params(dataset, args=args)
 
-    metamodel = EnsembleVAE(params,
-                            args.ensemble_size, 
-                            args.modelname,
-                            args.feature_fraction,)
+    metamodel = EnsembleVAE(params, args.ensemble_size)
 
     if not args.evaluate:
         metamodel.fit(dataset,

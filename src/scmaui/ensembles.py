@@ -24,18 +24,16 @@ class EnsembleVAE:
         Model parameters
     ensemble_size : int
         Ensemble size. Default=1
-    model : str
-        Model name. Currently not in use.
-    feature_fraction : float
-        Subset fraction of features for ensemble training. Currently not in use.
+    model : str or None
+        Model name. Currently only 'vae' is available.
     """
 
-    def __init__(self, params, ensemble_size=1, model=None, feature_fraction=1.):
+    def __init__(self, params, ensemble_size=1, model=None):
         self.ensemble_size = ensemble_size
         self.models = []
 
         self.space = params
-        self.feature_fraction = max(min(feature_fraction, 1.), 0.)
+        #self.feature_fraction = max(min(feature_fraction, 1.), 0.)
         if model is None:
             model = 'vae'
         self.model = model
@@ -62,7 +60,7 @@ class EnsembleVAE:
         assert len(self.models) > 0, "No models available yet."
         self.models[0].summary()
 
-    def save(self, path, overwrite=False):
+    def save(self, path):
         """ save the ensemble """
         for r, model in enumerate(self.models):
             subpath = os.path.join(path, f'model_{r+1}')
