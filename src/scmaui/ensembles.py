@@ -73,8 +73,8 @@ class EnsembleVAE:
             subpath = os.path.join(path, f'model_{r+1}')
             if not os.path.exists(os.path.join(subpath, 'model')):
                 print(f'no model in {subpath}')
+                return
 
-            print('re-load model')
             model = self._load(os.path.join(subpath, 'model', 'vae.h5'))
             model.compile(optimizer=
                           keras.optimizers.Adam(
@@ -82,11 +82,31 @@ class EnsembleVAE:
                               amsgrad=True)
                          )
             self.models.append(model)
+        print(f're-loaded models from {subpath}')
 
     def fit(self, dataset,
             shuffle=True, batch_size=64,
             epochs=1, validation_split=.15,):
-        """ fit an ensemble of VAE models."""
+        """ Fit an ensemble of VAE models.
+
+        Parameters
+        ----------
+        dataset : SCDataset
+            An SCDataset.
+        shuffle : bool
+            Whether to shuffle the dataset during training. Default: True.
+        batch_size : int
+            Batch size. Default: 64
+        epochs : int
+            Number of epochs. Default: 1
+        validation_split : float
+            Validation split. Default: 0.15
+
+        Returns
+        -------
+        list(history)
+            Training loss history.
+        """
         space = self.space
         histories = []
 
@@ -119,12 +139,51 @@ class EnsembleVAE:
         df = pd.concat(dfs, axis=1)
         return df, dfs
 
-    def encode(self, dataset, batch_size=64, skip_outliers=True):
-        """ Inference on the latent features """
-        return self.encode_full(dataset, batch_size, skip_outliers=skip_outliers)
+    def encode(self, dataset, batch_size=64):
+        """ Latent feature encoding
+
+        This method determines the latent feature (e.g. the last layer of the encoder).
+
+        Parameters
+        ----------
+        dataset : SCDataset
+            An SCDataset.
+        batch_size : int
+            Batch size to use for evaluating the imputation.
+
+        Returns
+        -------
+        tuple(np.array, list(np.array)):
+            The first element of the returned tuple contains the combined (stacked) encoding
+            across the ensemble of VAEs. Its dimension is cells by ensemble_size x latent dims.
+            The second element of the returned tuple contains the individual encodings per model.
+            Each encoding is of dimension cells by latent dims.
+        """
+        return self.encode_full(dataset, batch_size)
 
     def impute(self, dataset, batch_size=64):
-        """ Inference on the output features """
+        """ Imputation
+
+        This method performs imputation on the original input features.
+        If more than one model is available in the ensemble, the average prediction
+        across all individual models is returned.
+
+        Parameters
+        ----------
+        dataset : SCDataset
+            An SCDataset.
+        batch_size : int
+            Batch size to use for evaluating the imputation.
+
+        Returns
+        -------
+        list(np.array)
+            A list of numpy arrays containing the imputed feature.
+            Each entry in the list reflects predictions for a modality
+            with dimensions $C \times F_i$ where C denotes the
+            number of cells and
+            $F_i$ denotes the input feature dimensionality of the ith modality.
+        """
         tf_X = dataset.imputation_data(batch_size=batch_size)
 
         output = [np.zeros((dataset.size(), m)) for m in dataset.shapes()['outputdims']]
@@ -139,6 +198,44 @@ class EnsembleVAE:
         return output
 
     def explain(self, dataset, cellids, baselineids=None, modelid=0):
+        """ Explain latent features based on input features.
+
+        This method makes use of integrated gradients in order to 
+        attibute the input feature importances on the latent features.
+        Integrated gradients evalutes the path integral between a baseline
+        input and the target datapoint.
+        This method evaluates the average feature attribution across multiple
+        cells/samples assuming that the target cells/samples are inherently similar
+        to one another (e.g. cells within one cluster).
+        As baseline, a random selection of negative cells/samples are chosen (as opposed
+        to an all-zeros input). It is possible to specify the baseline cells/samples
+        through the baselineids argument.
+
+
+        Parameters
+        ----------
+        dataset : SCDataset
+            An SCDataset object.
+        cellids : list(str)
+            A list of cell/sample ids for which the feature attribution should be determined.
+            cellids should be indices in the dataset (e.g. contained in adata.obs.index).
+        baselineids : list(str) or None
+            A list of negative cell/sample ids used as contrast for the feature attribution.
+            If None, negative cell ids are randomly selected from the remaining cells in the dataset.
+            Default: None.
+        modelid : int
+            Model index referencing the model in the ensemble. Feature explanation is only determined
+            based on a single-model in the ensemble. Default: 0
+
+        Returns
+        -------
+        list(np.array)
+            A list of numpy arrays containing the feature attributions.
+            Each entry in the list reflects attributions for a modality
+            with dimensions $F_i \times L$ where
+            $F_i$ denotes the input feature dimensionality of the ith modality and
+            L the latent feature dimensions.
+        """
         # get positive and baseline examples
         posdata = dataset.subset(cellids)
         if baselineids is None:
