@@ -45,13 +45,13 @@ def get_model_params(dataset, args=None):
         nparams = OrderedDict(
           [
             ('nlayers_encoder', args.nlayers_encoder),
-            ('nunits_encoder', args.nhidden_encoder),
+            ('nunits_encoder', args.nunits_encoder),
             ('nlayers_decoder', args.nlayers_decoder),
-            ('nunits_decoder', args.nhidden_decoder),
+            ('nunits_decoder', args.nunits_decoder),
             ('dropout_input', args.dropout_input),
             ('dropout_encoder', args.dropout_encoder),
             ('dropout_decoder', args.dropout_decoder),
-            ('nunits_adversary', args.nhidden_adversary),
+            ('nunits_adversary', args.nunits_adversary),
             ('nlayers_adversary', 2),
             ('nlatent', args.nlatent),
             ('losses', args.loss),

@@ -86,7 +86,7 @@ def main(args=None):
                         action='store_true', default=False,
                         help='Skip models with outlier loss (aka poor local optimum)')
 
-    parser.add_argument('-nunits_e', '-nunits_encoder', '-nue', dest='nhidden_encoder', type=int,
+    parser.add_argument('-nunits_e', '-nunits_encoder', '-nue', dest='nunits_encoder', type=int,
                         default=32,
                         help="Number of neurons per encoder layer. "
                              "This number is constant across the encoder. Default: 512.")
@@ -96,7 +96,7 @@ def main(args=None):
     parser.add_argument('-nunits_d', '-nunits_decoder', '-nud', dest='nunits_decoder', type=int,
                         default=16,
                         help="Number of neurons per decoder hidden layer. "
-                             "Usually it is important to set nhidden_d as well as nlatent to relatively small values. "
+                             "Usually it is important to set nunits_d as well as nlatent to relatively small values. "
                              " Too high numbers for these parameters degrades the quality of the latent features. "
                              "Default: 16.")
     parser.add_argument('-nlayers_d', '-nlayers_decoder', '-nld', dest='nlayers_decoder', type=int,
