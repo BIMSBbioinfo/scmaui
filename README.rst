@@ -1,16 +1,17 @@
 ========
-BAVARIA
+scMaui
 ========
 
-BAVARIA is python package that implements a
-Batch-adversarial Variational auto-encoder with Negative Multinomial reconstruction loss for single-cell ATAC-seq analysis.
+scMaui is python package that implements a
+variational auto-encoder for multi-omics data integration.
+The model is capable of handling variable numbers input and output modalities
+as well as missing modalities.
+The model also features a range of log-likelihood implementations for determining the reconstruction
+loss, including the negative binomial or the negative multinomial model.
 
 .. image:: scmaui_scheme.svg
   :width: 600
 
-In particular, the model can be used to extract a latent feature representation of
-a cell which can be used for downstream analysis tasks, including cell cluster,
-cell identification, etc.
 The package is freely available under a GNU Lesser General Public License v3 or later (LGPLv3+)
 
 Installation
@@ -18,16 +19,49 @@ Installation
 
 ::
 
-    pip install https://github.com/BIMSBbioinfo/scmaui/archive/v0.1.0.zip
+    pip install https://github.com/BIMSBbioinfo/scmaui/archive/v0.0.1.zip
+
+
+Usage
+=====
+
+.. code-block:: python
+
+   from pkg_resources
+   from scmaui.data import load_data, SCDataset
+   from scmaui.utils import get_model_params
+   from scmaui.ensembles import EnsembleVAE
+
+   # get some toy data
+   toy_data_path = pkg_resources.resource_filename('scmaui', 'resources/gtx.h5ad')
+
+   adatas = load_data([gtx], names=['gtx'])
+   dataset = SCDataset(adatas, losses=['negbinom'])
+
+   # create an scMaui model
+   params = get_model_params(dataset)
+   ensemble = EnsembleVAE(params=params)
+
+   # fit the model
+   ensemble.fit(dataset, epochs=10)
+   ensemble.summary()
+
+   # obtain latent features
+   latents, _ = ensemble.encode(dataset)
+
+   # obtain imputation
+   imputed = ensemble.impute(dataset)
+
+   # obtain input feature attribution
+   selected_cells = latent.index.tolist()[:5] # select first 5 cells
+   explanation = ensemble.explain(dataset, cellids=selected_cells)
 
 
 Documentation
 =============
 
-BAVARIA offers a command line interface that fits an ensemble of BAVARIA models
-given a raw count matrix (-data)
-Subsequently, the model parameters and latent features
-are stored in the output directory (-output)
+scMaui offers a command line interface for model fitting.
+The results are stored in an output directory (-output).
 
 ::
 
