@@ -49,10 +49,10 @@ Usage
    # obtain latent features
    latents, _ = ensemble.encode(dataset)
 
-   # obtain imputation
+   # obtain an imputation
    imputed = ensemble.impute(dataset)
 
-   # obtain input feature attribution
+   # obtain input feature attributions
    selected_cells = latent.index.tolist()[:5] # select first 5 cells
    explanation = ensemble.explain(dataset, cellids=selected_cells)
 
