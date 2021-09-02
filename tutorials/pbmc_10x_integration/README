@@ -1,0 +1,17 @@
+This example illustrates how to run scMaui to integrated single-cell multiomics datasets with single-omics datasets
+using PBMC data from 10X Genomics.
+We use a dataset with paired measurements (scRNA + scATAC) and jointly model it with an additional scRNA-seq dataset.
+
+To download and prepare the datasets run:
+bash 00_downloads.bash
+python 02_prepare_rna_atac_multiome.py
+python 03_combine_scrna_rna_multiome.py
+
+To run data integration using only the scRNA-seq portion of the data use:
+python 04_run_scmaui_rna_nocorr.py
+python 04_run_scmaui_rna_cond.py
+python 04_run_scmaui_rna_adv.py
+
+To run data integration using scRNA-seq and scATAC-seq modalities from different batches use:
+python 05_run_scmaui_multi_nocorrection.py
+python 05_run_scmaui_multi_adversarial.py
