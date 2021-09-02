@@ -57,7 +57,7 @@ Usage
    explanation = ensemble.explain(dataset, cellids=selected_cells)
 
 
-Documentation
+Command-line usage
 =============
 
 scMaui offers a command line interface for model fitting.
