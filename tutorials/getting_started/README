@@ -1,0 +1,4 @@
+The getting started tutorial contains notebooks
+that illustrate how to run the scMaui functionality on toy data.
+
+To execute all notebooks you can invoke `bash run.bash`
