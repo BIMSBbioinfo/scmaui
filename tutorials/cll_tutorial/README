@@ -1,0 +1,17 @@
+The CLL tutorial illustrates how to perform scMaui
+on blood cancer samples from 200 patients (Dietrich et al. J Clin Invest 2018).
+This dataset has been used as use case also for MOFA (Argelaguet et al. Mol Syst Biol 2018).
+
+To perpare the dataset R and the MOFAdata package are required to run `00_get_cll_data.R`.
+Subsequently, the data are loaded and saved as AnnData objects using `01_make_adata.py`.
+
+scMaui is run on these datasets in various flavors, including with conditional inputs 
+or using adversarial training:
+
+python 02_run_scmaui_nocorrection.py
+python 02_run_scmaui_conditional.py
+python 02_run_scmaui_adversarial.py
+
+The results can be explored using 03_visalize_results.ipynb.
+
+Optionally, for a comparison one could run MOFA on the same dataset to inspect its latent features.
