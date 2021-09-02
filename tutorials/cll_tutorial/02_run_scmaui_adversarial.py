@@ -17,7 +17,6 @@ adatas = load_data(datapaths, ['drugs', 'mRNA', 'Methyl', 'Mutation'])
 
 dataset = SCMauiDataset(adatas, losses=['mse', 'mse', 'mse', 'binary'], union=True, adversarial=['Gender'])
 params = get_model_params(dataset)
-#params['losses'] = ['mse', 'mse', 'mse', 'binary']
 print(params)
 
 ensemblevae = EnsembleVAE(params=params,
