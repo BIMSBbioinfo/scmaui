@@ -279,7 +279,7 @@ def adversarial_predictor(layer, mask, targets, params, idx):
     x = layer
     
     for i in range(params['nlayers_adversary']):
-       x = layers.Dense(params['nhidden_adversary'], activation='elu', name=f'advnet_{idx}1{i}')(x)
+       x = layers.Dense(params['nunits_adversary'], activation='elu', name=f'advnet_{idx}1{i}')(x)
        #x = layers.BatchNormalization(name=f'advnet_{idx}2{i}')(x)
     pred_targets = [layers.Dense(dim, activation=_getlabel(ptype),
                                  name=f'advnet_out_{idx}' + bname)(x) \
