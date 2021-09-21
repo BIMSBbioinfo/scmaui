@@ -274,7 +274,7 @@ class SCDataset:
         Default: True. 
     """
     def __init__(self, adata, losses, adversarial=None, conditional=None, union=True):
-        adata = copy.deepcopy(adata)
+        adata = { key: [ada.copy() for ada in value] for key, value in adata.items() }
         self.union = union
         self.adata = _unionize(adata) if union else _intersect(adata)
         self.adversarial = [] if adversarial is None else adversarial
