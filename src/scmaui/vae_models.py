@@ -1,6 +1,6 @@
 import os
 import tensorflow as tf
-from keras.models import load_model
+from tensorflow.keras.models import load_model
 from scmaui.layers import CUSTOM_OBJECTS
 import numpy as np
 

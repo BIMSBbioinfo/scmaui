@@ -69,8 +69,8 @@ setup(
     ],
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*',
     install_requires=[
-        'keras==2.4.3',
-        'tensorflow==2.4',
+        #'keras==2.4.3',
+        'tensorflow==2.6',
         'numpy',
         'pandas',
         'scikit-learn',

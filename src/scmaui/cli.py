@@ -19,7 +19,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import keras
+from tensorflow import keras
 from scmaui import __version__
 from scmaui.ensembles import EnsembleVAE
 from scmaui.data import load_data
