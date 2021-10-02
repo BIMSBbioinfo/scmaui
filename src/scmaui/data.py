@@ -183,12 +183,25 @@ def to_dataset(X, advlabels=None, condlabels=None, Y=None, batch_size=64, shuffl
     ds = ds.prefetch(8)
     return ds
 
+def is_matching_indices(adata):
+    refid = indices = adata['input'][0].obs.index.tolist()
+    allequal = True
+    for ada in adata['input'] + adata['output']: 
+        if refid != ada.obs.index.tolist():
+            allequal = False
+            break
+    return allequal
+
 def _unionize(adata):
     """ Union datasets
 
     Unionize all datasets w.r.t. samples that are not shared.
     That is, samples that are not shared will be filled with missing values.
     """
+    if is_matching_indices(adata):
+        # no action necessary
+        return adata
+
     # obtain all indices 
     indices = []
     for ada in adata['input']:
@@ -236,16 +249,19 @@ def _intersect(adata):
 
     Only use common samples across all datasets
     """
+    if is_matching_indices(adata):
+        # no action necessary
+        return adata
+
     # obtain all indices 
     indices = adata['input'][0].obs.index.tolist()
-    for ada in adata['input']:
+    for ada in adata['input'] + adata['output']:
         indices = list(set(indices).intersection(set(ada.obs.index.tolist())))
-    for ada in adata['output']:
-        indices = list(set(indices).intersection(set(ada.obs.index.tolist())))
+
     for i, ada in enumerate(adata['input']):
-        adata['input'][i] = ada[indices,:].copy()
+        adata['input'][i] = ada[ada.obs.index.isin(indices),:].copy()
     for i, ada in enumerate(adata['output']):
-        adata['output'][i] = ada[indices,:].copy()
+        adata['output'][i] = ada[ada.obs.index.isin(indices),:].copy()
 
     return adata
 
