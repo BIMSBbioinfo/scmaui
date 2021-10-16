@@ -123,7 +123,7 @@ class EnsembleVAE:
                               amsgrad=True),
                          )
             history = model.fit(tf_X, epochs = epochs, validation_data=(tf_X_test,),
-                                callbacks=CSVLogger('train_summary.csv'))
+                                callbacks=CSVLogger('train_summary.csv'), verbose=2)
             histories.append(history)
             self.models.append(model)
         return histories
