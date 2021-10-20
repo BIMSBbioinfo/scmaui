@@ -379,7 +379,9 @@ class SCDataset:
     def __len__(self):
         return self.size()
 
-    def training_data(self, batch_size=64, validation_split=0.15, as_tf_data=True):
+    def training_data(self, batch_size=64,
+                      validation_split=0.15,
+                      as_tf_data=True, shuffle=True):
         """ returns a tensorflow.data.Dataset for training """
         # unpack the data
         X, mask_x, Y, mask_y, advlabel, condlabel, _, _ = self._get_input_output_data(self.adata)
@@ -404,11 +406,11 @@ class SCDataset:
             return ([x_train, mask_x_train], advlabel_train, condlabel_train, [y_train, mask_y_train]), \
                    ([x_test, mask_x_test], advlabel_test, condlabel_test, [y_test, mask_y_test])
 
-        tf_X = to_dataset([x_train, mask_x_train], advlabel_train, condlabel_train, [y_train, mask_y_train], shuffle=True, batch_size=batch_size)
+        tf_X = to_dataset([x_train, mask_x_train], advlabel_train, condlabel_train, [y_train, mask_y_train], shuffle=shuffle, batch_size=batch_size)
         tf_X_test = to_dataset([x_test, mask_x_test], advlabel_test, condlabel_test, [y_test, mask_y_test], shuffle=False)
         return tf_X, tf_X_test
 
-    def evaluation_data(self, batch_size=64, as_tf_data=True):
+    def evaluation_data(self, batch_size=64, as_tf_data=True, shuffle=False):
         """ returns a tensorflow.data.Dataset for evaluating the encoder """
 
         X, mask_x, _, _, alabel, condlabel, _, _ = self._get_input_output_data(self.adata, dummy_labels=True)
@@ -416,10 +418,10 @@ class SCDataset:
         if not as_tf_data:
             return [X, mask_x], alabel, condlabel
 
-        tf_X = to_dataset([X, mask_x], alabel, condlabel, shuffle=False, batch_size=batch_size)
+        tf_X = to_dataset([X, mask_x], alabel, condlabel, shuffle=shuffle, batch_size=batch_size)
         return tf_X
 
-    def imputation_data(self, batch_size=64, as_tf_data=True):
+    def imputation_data(self, batch_size=64, as_tf_data=True, shuffle=False):
         """ returns a tensorflow.data.Dataset for evaluating the vae for imputation """
 
         X, mask_x, Y, mask_y, alabel, condlabel, _, _ = self._get_input_output_data(self.adata, dummy_labels=True)
@@ -427,7 +429,7 @@ class SCDataset:
         if not as_tf_data:
             return [X, mask_x], alabel, condlabel, [Y, mask_y]
 
-        tf_X = to_dataset([X, mask_x], alabel, condlabel, [Y, mask_y], shuffle=False, batch_size=batch_size)
+        tf_X = to_dataset([X, mask_x], alabel, condlabel, [Y, mask_y], shuffle=shuffle, batch_size=batch_size)
         return tf_X
 
     def _get_label(self, adata, col, dummy_labels=True):
