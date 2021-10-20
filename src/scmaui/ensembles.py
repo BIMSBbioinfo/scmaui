@@ -129,7 +129,7 @@ class EnsembleVAE:
         return histories
 
     def encode_full(self, dataset, batch_size=64):
-        tf_X = dataset.evaluation_data(batch_size=batch_size)
+        tf_X = dataset.embedding_data(batch_size=batch_size)
         dfs = []
         for i, model in enumerate(self.models):
            
@@ -245,8 +245,8 @@ class EnsembleVAE:
             negdata = dataset.subset(baselineids)
             negdata = negdata.sample(len(cellids))
 
-        posdata = posdata.evaluation_data(as_tf_data=False)
-        negdata = negdata.evaluation_data(as_tf_data=False)
+        posdata = posdata.embedding_data(as_tf_data=False)
+        negdata = negdata.embedding_data(as_tf_data=False)
          
         S = 50 # integration steps
         # prepare new dataset for the integration
