@@ -207,6 +207,11 @@ def create_modality_decoder(params, latent, target, mask, covariates, loss):
         logits = layers.Activation(activation=tf.math.softplus)(logits)
         prob_loss = PoissonEndpoint()([target_, mask_, logits])
 
+    elif loss == 'mae':
+
+        mu = logits
+        prob_loss = MAEEndpoint()([target_, mask_, mu])
+
     elif loss == 'mse':
 
         mu = logits

@@ -479,6 +479,24 @@ class MutInfoLayer(layers.Layer):
         return x
 
 
+class MAEEndpoint(layers.Layer):
+    """ MAE-endpoint """
+    def call(self, inputs):
+        targets = None
+        targets, masks, mu = inputs
+
+        if targets is not None:
+
+            reconstruction_loss = tf.reduce_mean(
+                           masks * tf.keras.losses.mean_absolute_error(targets, mu)
+                         )
+            self.add_loss(reconstruction_loss)
+
+            tf.debugging.check_numerics(reconstruction_loss,
+                                        "MAEEndpoint NaN")
+
+        return mu
+
 class MSEEndpoint(layers.Layer):
     """ MSE-endpoint """
     def call(self, inputs):
@@ -719,6 +737,7 @@ class MixtureModelEndpoint(layers.Layer):
 CUSTOM_OBJECTS = {'Sampling': Sampling,
                   'KLlossLayer': KLlossLayer,
                   'ClipLayer': ClipLayer,
+                  'MAEEndpoint': MAEEndpoint,
                   'MSEEndpoint': MSEEndpoint,
                   'MultinomialEndpoint': MultinomialEndpoint,
                   'BinomialEndpoint': BinomialEndpoint,
