@@ -22,6 +22,7 @@ def init_model_params():
         ('dropout_decoder', 0.0),
         ('nunits_adversary', 128),
         ('nlayers_adversary', 2),
+        ('kl_weight', 0.0),
         ('nlatent', 10),
         ('nmixcomp', 1),
       ]

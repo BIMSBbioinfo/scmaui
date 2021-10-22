@@ -368,12 +368,22 @@ class Sampling(layers.Layer):
 
 
 class KLlossLayer(layers.Layer):
+    def __init__(self, kl_weight, *args, **kwargs):
+        self.kl_weight = kl_weight
+        super(KLlossLayer, self).__init__(*args, **kwargs)
+
+    def get_config(self):
+        config = {'kl_weight': self.kl_weight }
+        base_config = super(KLlossLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
     """ Compute KL-divergence """
     def call(self, inputs):
         z_mean, z_log_var = inputs
         kl_loss = 1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var)
         kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=-1))
         kl_loss *= -0.5
+        kl_loss *= tf.constant(self.kl_weight)
         tf.debugging.check_numerics(kl_loss, 'kl_loss layer nan')
         self.add_loss(kl_loss)
         return z_mean, z_log_var

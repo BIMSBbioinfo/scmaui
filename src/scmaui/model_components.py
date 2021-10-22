@@ -72,17 +72,15 @@ def create_encoder_base(params):
     hiddens = []
     z_means = []
     z_log_vars = []
-    z_samples = []
     for inp in inputs:
         hidden, z_mean, z_log_var = create_modality_encoder(inp, covariates, params)
         hiddens += hidden
         z_means.append(z_mean)
         z_log_vars.append(z_log_var)
-        z_samples.append(Sampling()([z_mean, tf.stop_gradient(z_log_var)]))
 
     z_joint_log_var = JointSigma(name='z_sigma')(z_log_vars, masks)
     z_joint_mean = JointMean(name='z_mean')(z_means, z_log_vars, masks)
-    z_joint_mean, z_joint_log_var = KLlossLayer()([z_joint_mean,z_joint_log_var])
+    z_joint_mean, z_joint_log_var = KLlossLayer(kl_weight=params['kl_weight'])([z_joint_mean,z_joint_log_var])
 
     z = Sampling(name='random_latent')([z_joint_mean, z_joint_log_var])
  
