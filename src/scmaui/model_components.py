@@ -189,10 +189,9 @@ def create_modality_decoder(params, latent, target, mask, covariates, loss):
     elif loss == 'dirmul':
 
         logits_mul = logits
-        alphasum = layers.Dense(1, activation='linear')(covariates)
-        alphasum = layers.Activation(activation=tf.math.softplus)(r)
+        logits_mul = layers.Activation(activation=tf.math.softplus)(logits)
 
-        prob_loss = DirichletMultinomialEndpoint()([target_, mask_, logits_mul, musum])
+        prob_loss = DirichletMultinomialEndpoint()([target_, mask_, logits_mul])
 
     elif loss == 'mul':
 

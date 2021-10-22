@@ -210,63 +210,31 @@ def negative_multinomial_likelihood_v2(targets, mul_logits, p0_logits, r):
     return likeli
 
 @tf.function
-def dirichlet_multinomial_likelihood(targets, mul_logits, alphasum):
+def dirichlet_multinomial_likelihood(targets, mul_logits):
     """ dirichlet multinomial-likelihood """
     mask = tf.where(tf.math.is_nan(targets),
                     tf.zeros_like(targets),
                     tf.ones_like(targets))
+
     T = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
     X = tf.reduce_sum(T, axis=-1)
 
     # correct in case there are missing values
-    alpha = _softmax(mul_logits) * alphasum
-    alphasum_new = alpha * mask
+    alpha = mul_logits
+    alphasum = tf.reduce_sum(alpha * mask, axis=-1)
 
     #nb likelihood
-    likeli0 = tf.math.lgamma(alphasum_new)
+    likeli0 = tf.math.lgamma(alphasum)
     likeli0 += tf.math.lgamma(X+1)
-    likeli0 -= tf.math.lgamma(X + alphasum_new)
-
-    likeli1 += mask * tf.math.lgamma(T + alpha)
+    likeli0 -= tf.math.lgamma(X + alphasum)
+    likeli1 = mask * tf.math.lgamma(T + alpha)
     likeli1 -= mask * tf.math.lgamma(alpha)
     likeli1 -= mask * tf.math.lgamma(T + 1.)
+    likeli1 = tf.reduce_sum(likeli1, axis=-1)
 
-    likeli = likeli0 + tf.reduce_sum(likeli1, axis=-1)
+    likeli = likeli0 + likeli1
     tf.debugging.check_numerics(likeli, "dirichlet_multinomial_likelihood")
     return likeli
-
-
-#@tf.function
-#def dirichlet_likelihood(targets, mul_logits, alphasum):
-#    mask = tf.where(tf.math.is_nan(targets),
-#                    tf.zeros_like(targets),
-#                    tf.ones_like(targets))
-#    T = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
-#    X = tf.reduce_sum(T, axis=-1)
-#
-#    mul_logits += tf.where(tf.math.is_nan(targets),
-#                           tf.math.log(tf.zeros_like(targets)),
-#                           tf.zeros_like(targets))
-#
-#    # correct in case there are missing values
-#    alpha = _softmax(mul_logits) * alphasum
-#    alphasum_new = alpha * mask
-#
-#    likeli = tf.math.lgamma(tf.math.reduce_sum(alpha, axis=-1))
-#    likeli -= tf.math.lgamma(alpha
-#
-#    #nb likelihood
-#    likeli0 = tf.math.lgamma(alphasum_new)
-#    likeli0 += tf.math.lgamma(X+1)
-#    likeli0 -= tf.math.lgamma(X + alphasum_new)
-#
-#    likeli1 += mask * tf.math.lgamma(T + alpha)
-#    likeli1 -= mask * tf.math.lgamma(alpha)
-#    likeli1 -= mask * tf.math.lgamma(T + 1.)
-#
-#    likeli = likeli0 + tf.reduce_sum(likeli1, axis=-1)
-#    tf.debugging.check_numerics(likeli, "dirichlet_likelihood")
-#    return likeli
 
 
 @tf.function
@@ -653,19 +621,19 @@ class DirichletMultinomialEndpoint(layers.Layer):
     """ Dirichlet-multinomial-endpoint """
     def call(self, inputs):
         targets = None
-        targets, mask, mul_logits, alphasum = inputs
+        targets, mask, mul_logits = inputs
 
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           mask * dirichlet_multinomial_likelihood(targets, mul_logits, alphasum)
+                           mask * dirichlet_multinomial_likelihood(targets, mul_logits)
                          )
             self.add_loss(reconstruction_loss)
 
             tf.debugging.check_numerics(reconstruction_loss,
                                         "DirichletMultinomialEndpoint NaN")
 
-        p = _softmax(mul_logits) * alphasum
+        p = mul_logits
         return p
 
 class NegativeMultinomialEndpointV2(layers.Layer):
