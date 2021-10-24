@@ -95,6 +95,57 @@ def create_encoder_base(params):
 
     return encoder
 
+def create_common_encoder(params):
+    """ Build encoders for all modalities and combine them. """
+
+    # configs
+    input_shape = params['inputdims']
+    mode_names = params['input_modality']
+
+    # inputs and modality masks
+    inputs = tuple([keras.Input(shape=(inp,),
+                    name='modality_' + name) for inp, name in zip(input_shape, mode_names)])
+    masks = tuple([keras.Input(shape=(1,),
+                   name='mask_'+name) for name in mode_names])
+
+    inputs_ = _concatenate(inputs)
+
+    # conditional inputs
+    conditional = tuple([keras.Input(shape=(ncat,),
+                                     name='condinput_'+name) for name, ncat \
+                                     in zip(params['conditional_name'],
+                                            params['conditional_dim'])])
+    covariates = _concatenate(conditional)
+
+    # adversarial inputs
+    adversarial = tuple([keras.Input(shape=(ncat,),
+                         name='advinput_'+name) for name, ncat \
+                         in zip(params['adversarial_name'],\
+                                params['adversarial_dim'])])
+
+    # resnet per modality
+    hiddens = []
+    hidden, z_mean, z_log_var = create_modality_encoder(inputs_, covariates, params)
+    hiddens += hidden
+
+    z_joint_mean = JointMean(name='z_mean')([z_mean], [z_log_var], masks[:1])
+    
+    z_mean, z_log_var = \
+          KLlossLayer(kl_weight=params['kl_weight'])([z_joint_mean,z_log_var])
+
+    z = Sampling(name='random_latent')([z_mean, z_log_var])
+ 
+    outputs = [z]
+    if len(adversarial) > 0:
+        # if adversarial labels are available, add
+        # a discriminator on top of the latent features.
+        loss = get_adversarial_net([z_mean], masks, adversarial, params)
+        outputs.append(loss)
+
+    encoder = keras.Model(((inputs, masks), (conditional, adversarial)), outputs, name="encoder")
+
+    return encoder
+
 def regressout(x, b, nhidden):
     breg = layers.Dense(nhidden)
     breg0 = layers.Dense(nhidden)
