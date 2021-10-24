@@ -281,10 +281,13 @@ class JointSigma(layers.Layer):
     """ Compute combined latent sigma across modalities """
     def __init__(self, *args, **kwargs):
         super(JointSigma, self).__init__(*args, **kwargs)
+
     def get_config(self):
         return super(JointSigma, self).get_config()
+
     def compute_output_shape(self, input_sigma, input_masks):
-        return input_sigma[0], input_mask[0]
+        return input_sigma[0]
+
     def call(self, sigmas, masks):
         if not isinstance(sigmas, (list, tuple)):
             sigmas = [sigmas]
@@ -308,10 +311,12 @@ class JointMean(layers.Layer):
     """ Compute combined latent means across modelities """
     def __init__(self, *args, **kwargs):
         super(JointMean, self).__init__(*args, **kwargs)
+
     def get_config(self):
         return super(JointMean, self).get_config()
+
     def compute_output_shape(self, input_mu, input_sigma, input_masks):
-        return input_mu[0], input_sigma[0], input_mask[0]
+        return input_mu[0]
         
     def call(self, mus, sigmas, masks):
         if not isinstance(mus, (list, tuple)):
@@ -334,7 +339,7 @@ class JointMean(layers.Layer):
 
         jointmean *= tf.math.reciprocal(jointvar)
         tf.debugging.check_numerics(jointmean, "jointmean_output nan")
-        self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.square(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
+        #self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.square(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
         self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.abs(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
         return jointmean
 
