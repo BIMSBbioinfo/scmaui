@@ -27,7 +27,7 @@ Usage
 
 .. code-block:: python
 
-   from pkg_resources
+   import pkg_resources
    from scmaui.data import load_data, SCDataset
    from scmaui.utils import get_model_params
    from scmaui.ensembles import EnsembleVAE
@@ -35,7 +35,7 @@ Usage
    # get some toy data
    toy_data_path = pkg_resources.resource_filename('scmaui', 'resources/gtx.h5ad')
 
-   adatas = load_data([gtx], names=['gtx'])
+   adatas = load_data([toy_data_path], names=['gtx'])
    dataset = SCDataset(adatas, losses=['negbinom'])
 
    # create an scMaui model
@@ -53,7 +53,7 @@ Usage
    imputed = ensemble.impute(dataset)
 
    # obtain input feature attributions
-   selected_cells = latent.index.tolist()[:5] # select first 5 cells
+   selected_cells = latents.index.tolist()[:5] # select first 5 cells
    explanation = ensemble.explain(dataset, cellids=selected_cells)
 
 
