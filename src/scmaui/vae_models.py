@@ -128,19 +128,21 @@ class VAE(tf.keras.Model):
 
             #for i, l in enumerate(self.encoder.losses):
             #    losses[f'encl{i}']=l
-            losses['kl'] = sum(self.encoder.losses)
+            # encoder returns both KL and joint mean loss
+            losses['encoder_joint_mean'] = self.encoder.losses[0]
+            losses['kl'] = self.encoder.losses[1] 
 
             pred = self.decoder([z, odata, omask, intercept, conditional, adversarial], training=True)
 
+            # Decoder returns a loss value for each modality 
             losses['recon'] = sum(self.decoder.losses)
 
-            losses['loss'] = losses['kl'] + losses['recon']
+            losses['loss'] = losses['kl'] + losses['recon'] + losses['encoder_joint_mean']
 
             if 'adv' in losses:
                 losses['loss'] -= losses['adv']
 
         tf.debugging.check_numerics(losses['loss'], "check total loss NaN")
-
         grads = tape.gradient(losses['loss'], self.encoder_params + self.decoder.trainable_weights)
         [tf.debugging.check_numerics(g, 'grad recon is nan') for g in grads]
         self.optimizer.apply_gradients(zip(grads, self.encoder_params + self.decoder.trainable_weights))
