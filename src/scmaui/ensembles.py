@@ -85,7 +85,7 @@ class EnsembleVAE:
         print(f're-loaded models from {subpath}')
 
     def fit(self, dataset,
-            shuffle=True, batch_size=64,
+            shuffle=True, batch_size=64, learning_rate=0.001,
             epochs=1, validation_split=.15,):
         """ Fit an ensemble of VAE models.
 
@@ -119,7 +119,7 @@ class EnsembleVAE:
 
             model.compile(optimizer=
                           keras.optimizers.Adam(
-                              learning_rate=0.001,
+                              learning_rate=learning_rate,
                               amsgrad=True),
                          )
             history = model.fit(tf_X, epochs = epochs, validation_data=(tf_X_test,),

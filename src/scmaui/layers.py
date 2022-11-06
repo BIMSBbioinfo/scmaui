@@ -339,8 +339,6 @@ class JointMean(layers.Layer):
 
         jointmean *= tf.math.reciprocal(jointvar)
         tf.debugging.check_numerics(jointmean, "jointmean_output nan")
-        #self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.square(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
-        self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.abs(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
         return jointmean
 
 class ClipLayer(layers.Layer):
@@ -436,7 +434,6 @@ class MutInfoLayer(layers.Layer):
 
         def _operation():
             # compute covariance
-            #x_zero = x - self.moving_mean
             x_zero = x - self.moving_mean
             x_zero_0 = tf.expand_dims(x_zero, -1)
             x_zero_1 = tf.expand_dims(x_zero, -2)
@@ -733,6 +730,5 @@ CUSTOM_OBJECTS = {'Sampling': Sampling,
                   'MixtureModelEndpoint':MixtureModelEndpoint,
                   'JointMean': JointMean,
                   'JointSigma': JointSigma,
-                  #'NanToZero': NanToZero,
                  }
 
