@@ -620,7 +620,7 @@ class NegativeMultinomialEndpoint(layers.Layer):
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           mask * negative_multinomial_likelihood(targets, logits, r)
+                           mask * tf.reduce_sum(negative_multinomial_likelihood(targets, logits, r), axis=-1)
                          )
             self.add_loss(reconstruction_loss)
 
