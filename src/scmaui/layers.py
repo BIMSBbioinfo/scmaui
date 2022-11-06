@@ -159,8 +159,10 @@ def zero_inflated_negative_binomial_likelihood(targets, logits, r, pi):
     loglikeli += r * tf.math.log_sigmoid(-logits)
     #zi
     loglikeli0 = tf.where(targets>0, tf.math.log(tf.zeros_like(targets)), targets)
-    loglikeli = tf.experimental.numpy.logaddexp(tf.math.log_sigmoid(pi) + loglikeli0, 
-                                             tf.math.log_sigmoid(-pi) + loglikeli)
+    #loglikeli = tf.experimental.numpy.logaddexp(tf.math.log_sigmoid(pi) + loglikeli0, 
+    #                                         tf.math.log_sigmoid(-pi) + loglikeli)
+
+    loglikeli = tf.math.log(tf.math.exp(tf.math.log_sigmoid(pi) + loglikeli0) + tf.math.exp(tf.math.log_sigmoid(-pi) + loglikeli))
 
     loglikeli *= mask
     return loglikeli
