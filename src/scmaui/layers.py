@@ -113,7 +113,7 @@ def multinomial_likelihood(targets, logits):
     targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
 
     logits += tf.math.log(mask)
-    loglikeli = target * (logits - tf.math.reduce_logsumexp(logits, axis=-1, keepdims=True))
+    loglikeli = targets * (logits - tf.math.reduce_logsumexp(logits, axis=-1, keepdims=True))
     return loglikeli
 
 @tf.function
@@ -705,6 +705,7 @@ class MixtureModelEndpoint(layers.Layer):
             reconstruction_loss = -tf.reduce_mean(
                           tf.math.reduce_sum(mask * tf.math.reduce_logsumexp(self.likelihood(*inp) + tf.math.log_softmax(pi) - tf.math.log(1e5), axis=-1), -1)
                          )
+            #gaussian_likelihood(targets, mu):
             self.add_loss(reconstruction_loss)
 
             tf.debugging.check_numerics(reconstruction_loss,
