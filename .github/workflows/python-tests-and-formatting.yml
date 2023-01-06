@@ -29,10 +29,8 @@ jobs:
         pip install pytest black
         pip install -e .
     - name: Check formatting
-      working-directory: ./scmaui
       run: |
         black --check .
     - name: Test with pytest
-      working-directory: ./scmaui
       run: |
         pytest -v
