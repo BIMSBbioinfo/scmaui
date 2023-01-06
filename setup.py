@@ -55,8 +55,7 @@ setup(
         "scanpy",
         "anndata",
     ],
-    extras_require={
-    },
+    extras_require={},
     entry_points={
         "console_scripts": [
             "scmaui = scmaui.cli:main",
