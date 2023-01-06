@@ -2,6 +2,11 @@
 scMaui
 ========
 
+|Tests badge|
+
+.. |Tests badge| image:: hhttps://github.com/BIMSBbioinfo/scmaui/actions/workflows/python-tests-and-formatting.yml/badge.svg
+   :https://github.com/BIMSBbioinfo/scmaui/actions/workflows/python-tests-and-formatting.yml:
+
 scMaui is python package that implements a
 variational auto-encoder for multi-omics data integration.
 The model is capable of handling variable numbers input and output modalities
