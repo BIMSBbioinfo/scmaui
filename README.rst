@@ -58,7 +58,7 @@ Usage
 
 
 Command-line usage
-=============
+==================
 
 scMaui offers a command line interface for model fitting.
 The results are stored in an output directory (-output).
