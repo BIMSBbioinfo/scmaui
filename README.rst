@@ -19,7 +19,7 @@ Installation
 
 ::
 
-    pip install https://github.com/BIMSBbioinfo/scmaui/archive/v0.0.1.zip
+    pip scmaui
 
 
 Usage

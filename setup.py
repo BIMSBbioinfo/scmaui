@@ -27,13 +27,7 @@ setup(
     version="0.0.2",
     license="LGPL-3.0-or-later",
     description="Negative multinomial variational auto-encoder",
-    long_description="%s\n%s"
-    % (
-        re.compile("^.. start-badges.*^.. end-badges", re.M | re.S).sub(
-            "", read("README.rst")
-        ),
-        re.sub(":[a-z]+:`~?(.*?)`", r"``\1``", read("CHANGELOG.rst")),
-    ),
+    long_description=open("README.rst").read(),
     author="Wolfgang Kopp",
     author_email="wolfgang.kopp@mdc-berlin.de",
     url="https://github.com/wkopp/scmaui",
