@@ -43,18 +43,6 @@ setup(
     py_modules=[splitext(basename(path))[0] for path in glob("src/*.py")],
     include_package_data=True,
     zip_safe=False,
-    classifiers=[
-        "Development Status :: 5 - Production/Stable",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)"
-        "Operating System :: Unix",
-        "Operating System :: POSIX",
-        "Operating System :: Microsoft :: Windows",
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 3.10",
-        "Topic :: Utilities",
-        "Private :: Do Not Upload",
-    ],
     project_urls={
         "Documentation": "https://scmaui.readthedocs.io/",
         "Changelog": "https://scmaui.readthedocs.io/en/latest/changelog.html",
