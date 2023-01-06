@@ -65,27 +65,29 @@ class EnsembleVAE:
         for r, model in enumerate(self.models):
             subpath = os.path.join(path, f'model_{r+1}')
             os.makedirs(subpath, exist_ok=True)
-            model.save(os.path.join(subpath, 'model', 'vae.h5'))
+            model.save(os.path.join(subpath, 'network', 'vae.h5'))
+            model.save_weights(os.path.join(subpath, "model", "vae.h5"))
 
-    def load(self, path):
+    def load(self, path, learning_rate=0.001):
         """ load a previously trained ensemble """
         for r in range(self.ensemble_size):
             subpath = os.path.join(path, f'model_{r+1}')
-            if not os.path.exists(os.path.join(subpath, 'model')):
+            if (not os.path.exists(os.path.join(subpath, 'network'))) or (not os.path.exists(os.path.join(subpath, 'model'))):
                 print(f'no model in {subpath}')
                 return
 
-            model = self._load(os.path.join(subpath, 'model', 'vae.h5'))
+            model = self._load(os.path.join(subpath, 'network', 'vae.h5'))
+            model.load_weights(os.path.join(subpath, 'model', 'vae.h5'))
             model.compile(optimizer=
                           keras.optimizers.Adam(
-                              learning_rate=0.001,
+                              learning_rate=learning_rate,
                               amsgrad=True)
                          )
             self.models.append(model)
         print(f're-loaded models from {subpath}')
 
     def fit(self, dataset,
-            shuffle=True, batch_size=64,
+            shuffle=True, batch_size=64, learning_rate=0.001,
             epochs=1, validation_split=.15,):
         """ Fit an ensemble of VAE models.
 
@@ -119,7 +121,7 @@ class EnsembleVAE:
 
             model.compile(optimizer=
                           keras.optimizers.Adam(
-                              learning_rate=0.001,
+                              learning_rate=learning_rate,
                               amsgrad=True),
                          )
             history = model.fit(tf_X, epochs = epochs, validation_data=(tf_X_test,),

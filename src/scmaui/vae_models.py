@@ -126,18 +126,14 @@ class VAE(tf.keras.Model):
             else:
                 z = ret
 
-            #for i, l in enumerate(self.encoder.losses):
-            #    losses[f'encl{i}']=l
-            # encoder returns both KL and joint mean loss
-            losses['encoder_joint_mean'] = self.encoder.losses[0]
-            losses['kl'] = self.encoder.losses[1] 
+            losses['kl'] = sum(self.encoder.losses) 
 
             pred = self.decoder([z, odata, omask, intercept, conditional, adversarial], training=True)
 
             # Decoder returns a loss value for each modality 
             losses['recon'] = sum(self.decoder.losses)
 
-            losses['loss'] = losses['kl'] + losses['recon'] + losses['encoder_joint_mean']
+            losses['loss'] = losses['kl'] + losses['recon'] 
 
             if 'adv' in losses:
                 losses['loss'] -= losses['adv']
@@ -171,7 +167,7 @@ class VAE(tf.keras.Model):
         else:
             z = ret
 
-        losses['kl'] = sum(self.encoder.losses)
+        losses['kl'] = sum(self.encoder.losses) 
 
         pred = self.decoder([z, odata, omask, intercept, conditional, adversarial], training=False)
 

@@ -113,7 +113,7 @@ def multinomial_likelihood(targets, logits):
     targets = tf.where(tf.math.is_nan(targets), tf.zeros_like(targets), targets)
 
     logits += tf.math.log(mask)
-    loglikeli = target * (logits - tf.math.reduce_logsumexp(logits, axis=-1, keepdims=True))
+    loglikeli = targets * (logits - tf.math.reduce_logsumexp(logits, axis=-1, keepdims=True))
     return loglikeli
 
 @tf.function
@@ -159,8 +159,10 @@ def zero_inflated_negative_binomial_likelihood(targets, logits, r, pi):
     loglikeli += r * tf.math.log_sigmoid(-logits)
     #zi
     loglikeli0 = tf.where(targets>0, tf.math.log(tf.zeros_like(targets)), targets)
-    loglikeli = tf.experimental.numpy.logaddexp(tf.math.log_sigmoid(pi) + loglikeli0, 
-                                             tf.math.log_sigmoid(-pi) + loglikeli)
+    #loglikeli = tf.experimental.numpy.logaddexp(tf.math.log_sigmoid(pi) + loglikeli0, 
+    #                                         tf.math.log_sigmoid(-pi) + loglikeli)
+
+    loglikeli = tf.math.log(tf.math.exp(tf.math.log_sigmoid(pi) + loglikeli0) + tf.math.exp(tf.math.log_sigmoid(-pi) + loglikeli))
 
     loglikeli *= mask
     return loglikeli
@@ -339,8 +341,6 @@ class JointMean(layers.Layer):
 
         jointmean *= tf.math.reciprocal(jointvar)
         tf.debugging.check_numerics(jointmean, "jointmean_output nan")
-        #self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.square(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
-        self.add_loss(tf.math.reduce_sum(tf.math.add_n([tf.math.abs(m*(tf.stop_gradient(jointmean) - mu)) for m, mu in zip(masks, mus)])))
         return jointmean
 
 class ClipLayer(layers.Layer):
@@ -436,7 +436,6 @@ class MutInfoLayer(layers.Layer):
 
         def _operation():
             # compute covariance
-            #x_zero = x - self.moving_mean
             x_zero = x - self.moving_mean
             x_zero_0 = tf.expand_dims(x_zero, -1)
             x_zero_1 = tf.expand_dims(x_zero, -2)
@@ -620,7 +619,7 @@ class NegativeMultinomialEndpoint(layers.Layer):
         if targets is not None:
 
             reconstruction_loss = -tf.reduce_mean(
-                           mask * negative_multinomial_likelihood(targets, logits, r)
+                           mask * tf.reduce_sum(negative_multinomial_likelihood(targets, logits, r), axis=-1)
                          )
             self.add_loss(reconstruction_loss)
 
@@ -708,6 +707,7 @@ class MixtureModelEndpoint(layers.Layer):
             reconstruction_loss = -tf.reduce_mean(
                           tf.math.reduce_sum(mask * tf.math.reduce_logsumexp(self.likelihood(*inp) + tf.math.log_softmax(pi) - tf.math.log(1e5), axis=-1), -1)
                          )
+            #gaussian_likelihood(targets, mu):
             self.add_loss(reconstruction_loss)
 
             tf.debugging.check_numerics(reconstruction_loss,
@@ -733,6 +733,5 @@ CUSTOM_OBJECTS = {'Sampling': Sampling,
                   'MixtureModelEndpoint':MixtureModelEndpoint,
                   'JointMean': JointMean,
                   'JointSigma': JointSigma,
-                  #'NanToZero': NanToZero,
                  }
 
