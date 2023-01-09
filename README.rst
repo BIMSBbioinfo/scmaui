@@ -71,13 +71,14 @@ The results are stored in an output directory (-output).
 ::
 
    scmaui -data adata.h5ad \
-         -names gtx \
+         -datanames gtx \
          -output <outputdir> \
          -epochs 200 \
          -ensemble_size 10 \
          -nlatent 15 \
          -adversarial label1 label2 \
-         -conditional covariate1 covariate2
+         -conditional covariate1 covariate2 \
+         -losses negmul negbinom
  
 Additional information on available hyper-parameters are available through
 
