@@ -49,7 +49,7 @@ setup(
     install_requires=[
         "scikit-learn",
 		"tensorflow==2.9.0",
-        "keras-nightly==2.9.*",
+        #"keras-nightly==2.9.*",
 		"numpy<1.24",
 		"protobuf==3.19.*",
         "pandas",
