@@ -47,7 +47,7 @@ setup(
     ],
     python_requires=">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*",
     install_requires=[
-        "tensorflow==2.2",
+        "tensorflow==2.2.0",
         "h5py>=3.0",
         "numpy",
         "pandas",
