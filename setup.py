@@ -24,7 +24,7 @@ def read(*names, **kwargs):
 
 setup(
     name="scmaui",
-    version="0.0.4",
+    version="0.0.5",
     license="LGPL-3.0-or-later",
     description="Negative multinomial variational auto-encoder",
     long_description=open("README.rst").read(),
