@@ -48,16 +48,15 @@ setup(
     python_requires=">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*",
     install_requires=[
         "scikit-learn",
-		"tensorflow==2.9.0",
-        #"keras-nightly==2.9.*",
-		"numpy<1.24",
-		"protobuf==3.19.*",
+        "tensorflow==2.9.0",
+        "numpy<1.24",
+        "protobuf==3.19.*",
         "pandas",
         "scipy",
         "scanpy",
         "anndata",
         "louvain",
-        "igraph"
+        "igraph",
     ],
     extras_require={},
     entry_points={
