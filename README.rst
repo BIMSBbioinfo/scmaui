@@ -14,7 +14,7 @@ as well as missing modalities.
 The model also features a range of log-likelihood implementations for determining the reconstruction
 loss, including the negative binomial or the negative multinomial model.
 
-.. image:: scmaui_scheme.svg
+.. image:: scMaui_scheme.png
   :width: 600
 
 The package is freely available under a GNU Lesser General Public License v3 or later (LGPLv3+)
@@ -86,3 +86,9 @@ Additional information on available hyper-parameters are available through
 
   scmaui -h
 
+
+Tutorials
+==================
+
+We provide tutorials for data preprocessing, scMaui usage and some downstream analyses. 
+You can find the tutorials `here <https://github.com/BIMSBbioinfo/scmaui-experiments/tree/main/tutorials>`_.
