@@ -19,6 +19,11 @@ loss, including the negative binomial or the negative multinomial model.
 
 The package is freely available under a GNU Lesser General Public License v3 or later (LGPLv3+)
 
+
+Citation
+==================
+scMaui paper is now available on `bioRxiv <https://www.biorxiv.org/content/10.1101/2023.01.18.524506v1>`_.
+
 Installation
 ============
 
@@ -92,3 +97,4 @@ Tutorials
 
 We provide tutorials for data preprocessing, scMaui usage and some downstream analyses. 
 You can find the tutorials `here <https://github.com/BIMSBbioinfo/scmaui-experiments/tree/main/tutorials>`_.
+
