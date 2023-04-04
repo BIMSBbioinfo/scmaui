@@ -29,7 +29,7 @@ Installation
 
 ::
 
-    pip scmaui
+    pip install scmaui
 
 
 Usage
